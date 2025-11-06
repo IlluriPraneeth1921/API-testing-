@@ -1,0 +1,10 @@
+{
+  "name": "609768_001_TC001",
+  "description": "Appointment test data for POST without primary key success request",
+  "dataSource": {
+    "type": "ExcelFile",
+    "filePath": "External_TestData/API/609768_Appointment.xlsx",
+    "sheetName": "609768_001_TC001",
+    "containsHeaders": true
+  }
+}
