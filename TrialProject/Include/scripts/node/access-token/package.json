@@ -1,0 +1,18 @@
+{
+  "name": "access-token",
+  "version": "1.0.0",
+  "description": "AWS Cognito Access Token Generator",
+  "main": "GetAccessToken.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node GetAccessToken.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "amazon-cognito-auth-js": "^1.3.3",
+    "amazon-cognito-identity-js": "^6.3.12",
+    "express": "^4.18.3",
+    "node.js": "^0.0.1-security"
+  }
+}

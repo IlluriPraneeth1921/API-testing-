@@ -1,0 +1,131 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>API Test Suite Summary Report</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { background-color: #f0f0f0; padding: 20px; border-radius: 5px; }
+            .summary { margin: 20px 0; }
+            .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+            .passed { background-color: #d4edda; border-left: 5px solid #28a745; }
+            .failed { background-color: #f8d7da; border-left: 5px solid #dc3545; }
+            .error { background-color: #fff3cd; border-left: 5px solid #ffc107; }
+            .stats { display: flex; gap: 20px; margin: 20px 0; }
+            .stat-box { padding: 15px; border-radius: 5px; text-align: center; min-width: 100px; }
+            .stat-passed { background-color: #28a745; color: white; }
+            .stat-failed { background-color: #dc3545; color: white; }
+            .stat-error { background-color: #ffc107; color: black; }
+            .stat-total { background-color: #007bff; color: white; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>API Test Suite Summary Report</h1>
+            <p>Generated: 2025-11-02 18:01:47</p>
+            <p>Report Source: api_json_report_20251102_180021.json</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box stat-total">
+                <h3>11</h3>
+                <p>Total Tests</p>
+            </div>
+            <div class="stat-box stat-passed">
+                <h3>3</h3>
+                <p>Passed</p>
+            </div>
+            <div class="stat-box stat-failed">
+                <h3>5</h3>
+                <p>Failed</p>
+            </div>
+            <div class="stat-box stat-error">
+                <h3>3</h3>
+                <p>Errors</p>
+            </div>
+        </div>
+        
+        <div class="summary">
+            <h2>Test Results Details</h2>
+    
+            <div class="test-result passed">
+                <h4>Scripts/API/AppointmentModule/Appointment/test_609768_001_tc001_post_without_primary_key_success_request.py::TestAppointmentPOSTWithoutPrimaryKey::test_609768_001_tc001_post_without_primary_key_success_request</h4>
+                <p><strong>Status:</strong> PASSED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+            <div class="test-result failed">
+                <h4>Scripts/API/test_generic_endpoints.py::TestGenericEndpoints::test_get_with_primary_key</h4>
+                <p><strong>Status:</strong> FAILED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        <p><strong>Error:</strong> Scripts\API\test_generic_endpoints.py:55: in test_get_with_primary_key
+    api_helper.assert_status_code(200)
+        api_helper = <helper.api_helper.APIHelper object at 0x0000021053B99D10>
+        ap...</p></div>
+            <div class="test-result failed">
+                <h4>Scripts/API/test_generic_endpoints.py::TestGenericEndpoints::test_get_without_primary_key</h4>
+                <p><strong>Status:</strong> FAILED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        <p><strong>Error:</strong> Scripts\API\test_generic_endpoints.py:78: in test_get_without_primary_key
+    api_helper.assert_status_code(200)
+        api_helper = <helper.api_helper.APIHelper object at 0x0000021054147890>
+       ...</p></div>
+            <div class="test-result failed">
+                <h4>Scripts/API/test_generic_endpoints.py::TestGenericEndpoints::test_post_without_primary_key</h4>
+                <p><strong>Status:</strong> FAILED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        <p><strong>Error:</strong> Scripts\API\test_generic_endpoints.py:103: in test_post_without_primary_key
+    api_helper.assert_status_code(201)
+        api_helper = <helper.api_helper.APIHelper object at 0x0000021054137100>
+     ...</p></div>
+            <div class="test-result failed">
+                <h4>Scripts/API/test_generic_endpoints.py::TestGenericEndpoints::test_put_with_primary_key</h4>
+                <p><strong>Status:</strong> FAILED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        <p><strong>Error:</strong> Scripts\API\test_generic_endpoints.py:130: in test_put_with_primary_key
+    api_helper.assert_status_code(200)
+        api_helper = <helper.api_helper.APIHelper object at 0x0000021054137BB0>
+        a...</p></div>
+            <div class="test-result failed">
+                <h4>Scripts/API/test_generic_endpoints.py::TestGenericEndpoints::test_delete_with_primary_key</h4>
+                <p><strong>Status:</strong> FAILED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        <p><strong>Error:</strong> Scripts\API\test_generic_endpoints.py:149: in test_delete_with_primary_key
+    api_helper.assert_status_code(204)
+        api_helper = <helper.api_helper.APIHelper object at 0x00000210551D5A30>
+      ...</p></div>
+            <div class="test-result passed">
+                <h4>Scripts/API/test_mockaroo_api.py::TestMockarooAPI::test_get_mockaroo_data</h4>
+                <p><strong>Status:</strong> PASSED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+            <div class="test-result passed">
+                <h4>Scripts/API/test_mockaroo_api.py::TestMockarooAPI::test_mockaroo_custom_endpoint</h4>
+                <p><strong>Status:</strong> PASSED</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+            <div class="test-result error">
+                <h4>Scripts/API/test_user_login_api.py::TestUserLoginAPI::test_user_login_api_success</h4>
+                <p><strong>Status:</strong> ERROR</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+            <div class="test-result error">
+                <h4>Scripts/API/test_user_login_api.py::TestUserLoginAPI::test_user_login_api_invalid_credentials</h4>
+                <p><strong>Status:</strong> ERROR</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+            <div class="test-result error">
+                <h4>Scripts/API/test_user_login_api.py::TestUserLoginAPI::test_user_profile_api_with_token</h4>
+                <p><strong>Status:</strong> ERROR</p>
+                <p><strong>Duration:</strong> 0.00s</p>
+        </div>
+        </div>
+        
+        <div class="summary">
+            <h2>Available Reports</h2>
+            <ul>
+    <li><a href='api_json_report_20251102_180021.json'>api_json_report_20251102_180021.json</a></li><li><a href='api_junit_report_20251102_180021.xml'>api_junit_report_20251102_180021.xml</a></li><li><a href='api_test_suite_report_20251102_180021.html'>api_test_suite_report_20251102_180021.html</a></li><li><a href='detailed_test_report.html'>detailed_test_report.html</a></li><li><a href='junit_report_20251102_175935.xml'>junit_report_20251102_175935.xml</a></li><li><a href='test_report.html'>test_report.html</a></li><li><a href='test_report_20251102_175935.html'>test_report_20251102_175935.html</a></li><li><a href='test_report_with_logs.html'>test_report_with_logs.html</a></li>
+            </ul>
+        </div>
+    </body>
+    </html>
+    
