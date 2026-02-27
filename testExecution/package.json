@@ -1,0 +1,41 @@
+{
+  "name": "pwd-bdd-ts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rimraf reports/cucumber-report.json",
+    "test": "npm run clean && cucumber-js",
+    "test:qa": "npm run clean && dotenv --quiet -e .env.qa -- cucumber-js",
+    "test:std-f1": "npm run clean && dotenv --quiet -e .env.std-f1 -- cucumber-js",
+    "test:smoke": "cucumber-js --tags @smoke",
+    "test:organization": "cucumber-js --tags @organization",
+    "test:org": "cucumber-js --tags @organization",
+    "test:navigation": "cucumber-js --tags @navigation",
+    "test:login": "cucumber-js --tags @login",
+    "test:user-management": "cucumber-js --tags @user-management",
+    "test:reporting": "cucumber-js --tags @reporting",
+    "test:integration": "cucumber-js --tags @integration",
+    "test:regression": "cucumber-js --tags @regression",
+    "test:sanity": "cucumber-js --tags @sanity",
+    "test:critical": "cucumber-js --tags @critical",
+    "test:high": "cucumber-js --tags @high",
+    "test:medium": "cucumber-js --tags @medium",
+    "test:low": "cucumber-js --tags @low"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@cucumber/cucumber": "^12.7.0",
+    "@playwright/test": "^1.58.2",
+    "dotenv": "^17.3.1",
+    "dotenv-cli": "^11.0.0",
+    "multiple-cucumber-html-reporter": "^3.10.0",
+    "playwright": "^1.58.2",
+    "rimraf": "^6.1.3",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
+  }
+}
