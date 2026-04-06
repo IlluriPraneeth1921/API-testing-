@@ -1,0 +1,134 @@
+﻿ID,Work Item Type,Title,Test Step,Step Action,Step Expected,Automation Status,Area Path,Changed Date,Created By,Created Date,State,Tags
+"556242","Test Case","[Bulk Assignments] Validate user is able to export the Bulk Assignments and validate data in the exported file is accurate",,,,"Automated","DC-ST\Carity\Core","Fri Apr 26 2024 15:28:38 GMT+0000 (Coordinated Universal Time)","Swetha Jangili <FEI\swetha.jangili>","Wed Feb 23 2022 18:32:07 GMT+0000 (Coordinated Universal Time)","Ready","BulkAssignmentsModule; Carity_STD_RegressionTest; InSuite; StdRAutomated"
+,,,"1","Login to the test environment
+","User is logged in and the Home page displays
+",,,,,,,
+,,,"2","Navigate to the 3 dot ellipsis menu and click Bulk Assignments","The Bulk Assignments List page displays",,,,,,,
+,,,"3","Fill in the required fields as desired for the test and click on Run Query","Bulk Assignments List page displays with the filtered records
+",,,,,,,
+,,,"4","Click on the Export button and save the file","File is saved",,,,,,,
+,,,"5","Validate the file is saved in an excel format","Validated",,,,,,,
+,,,"6","Open the exported file and validate the data in the file matches with the filtered data in the UI","Validated",,,,,,,
+,,,"7","Logout of the testing environment
+","User is logged out
+",,,,,,,
+"556255","Test Case","[Bulk Assignments] Validate the fields in Location Bulk Assignments and validate the user can assign the location",,,,"Automated","DC-ST\Carity\Core","Tue Apr 29 2025 13:33:05 GMT+0000 (Coordinated Universal Time)","Swetha Jangili <FEI\swetha.jangili>","Wed Feb 23 2022 19:01:46 GMT+0000 (Coordinated Universal Time)","Ready","BulkAssignmentsModule; Carity_STD_RegressionTest; InSuite; StdRAutomated"
+,,,"1","Login to the test environment
+","User is logged in and the Home page displays
+",,,,,,,
+,,,"2","Navigate to the 3 dot ellipsis menu and click Bulk Assignments","The Bulk Assignments List page displays",,,,,,,
+,,,"3","Fill in the required fields as desired for the test and click on Run Query","Bulk Assignments List page displays with the filtered records
+",,,,,,,
+,,,"4","Select 1 or more records and click on the Assign Location button in the Bulk Assignments list","Location Bulk Assignments modal displays",,,,,,,
+,,,"5","Validate the Assignment Type is a required field which is a single select drop down that displays the list of available Assignment Types
+","Validated",,,,,,,
+,,,"6","Validate the Location  is a required field which is a single select drop down that displays the list of available locations
+","Validated
+",,,,,,,
+,,,"7","Validate Effective Start Date is a required date field
+","Validated
+",,,,,,,
+,,,"8","Validate Note is a text field which only allows 10000 characters by attempting to add more and receiving an error message
+","Validated",,,,,,,
+,,,"9","Fill in data in all the required fields and click on Continue","A confirmation modal displays with the text: ""You are about to assign a location to the selected member records. Would you like to continue?""
+",,,,,,,
+,,,"10","Click on Continue and validate the status of the assignment is displayed","Validated",,,,,,,
+,,,"11","Click on the Close button and validate the changes are applied as per the status in step 10","Validated
+",,,,,,,
+,,,"12","Logout of the testing environment
+","User is logged out
+",,,,,,,
+"556256","Test Case","[Bulk Assignments] Validate the fields in Staff Member Bulk Assignments and validate the user can assign the staff",,,,"Automated","DC-ST\Carity\Core","Tue Apr 29 2025 13:33:30 GMT+0000 (Coordinated Universal Time)","Swetha Jangili <FEI\swetha.jangili>","Wed Feb 23 2022 19:05:10 GMT+0000 (Coordinated Universal Time)","Ready","BulkAssignmentsModule; Carity_STD_RegressionTest; InSuite; StdRAutomated"
+,,,"1","Login to the test environment
+","User is logged in and the Home page displays
+",,,,,,,
+,,,"2","Navigate to the 3 dot ellipsis menu and click Bulk Assignments","The Bulk Assignments List page displays",,,,,,,
+,,,"3","Fill in the required fields as desired for the test and click on Run Query","Bulk Assignments List page displays with the filtered records
+",,,,,,,
+,,,"4","Select 1 or more records and click on the Assign Staff button in the Bulk Assignments list","Staff Member Bulk Assignments modal displays",,,,,,,
+,,,"5","Validate the Assignment Type is a required field which is a single select drop down that displays the list of available Assignment Types
+","Validated",,,,,,,
+,,,"6","Validate the Staff Member is a required field which is a single select drop down that displays the list of available staff members
+","Validated",,,,,,,
+,,,"7","Validate the Location  is a required field which is a single select drop down that displays the list of available locations
+","Validated
+",,,,,,,
+,,,"8","Validate Effective Start Date is a required date field
+","Validated
+",,,,,,,
+,,,"9","Validate Note is a text field which only allows 10000 characters by attempting to add more and receiving an error message
+","Validated",,,,,,,
+,,,"10","Validate the ""Is Primary Assignment"" is a check box that is not required field","Validated",,,,,,,
+,,,"11","Fill in data in all the required fields and click on Continue","A confirmation modal displays with the text: ""You are about to assign a staff member to the selected member records. Would you like to continue?""
+",,,,,,,
+,,,"12","Click on Continue and validate the status of the assignment is displayed","Validated",,,,,,,
+,,,"13","Click on the Close button and validate the changes are applied as per the status in step 12","Validated
+",,,,,,,
+,,,"14","Logout of the testing environment
+","User is logged out
+",,,,,,,
+"556258","Test Case","[Bulk Assignments] Validate the fields in Location Bulk Unassignments and validate the user can unassign the location",,,,"Automated","DC-ST\Carity\Core","Tue Apr 29 2025 13:33:47 GMT+0000 (Coordinated Universal Time)","Swetha Jangili <FEI\swetha.jangili>","Wed Feb 23 2022 19:13:14 GMT+0000 (Coordinated Universal Time)","Ready","BulkAssignmentsModule; Carity_STD_RegressionTest; InSuite; StdRAutomated"
+,,,"1","Login to the test environment
+","User is logged in and the Home page displays
+",,,,,,,
+,,,"2","Navigate to the 3 dot ellipsis menu and click Bulk Assignments","The Bulk Assignments List page displays",,,,,,,
+,,,"3","Fill in the required fields as desired for the test and click on Run Query","Bulk Assignments List page displays with the filtered records
+",,,,,,,
+,,,"4","Select 1 or more records and click on the Unassign Location button in the Bulk Assignments list","Location Bulk Unassignments modal displays",,,,,,,
+,,,"5","Validate the Discharge Reason is a required field which is a single select drop down that displays the below values:
+ 
+Deceased
+Required higher level of care
+Declined Services
+Terminated Services
+Transferred
+Other
+","Validated",,,,,,,
+,,,"6","Validate if Discharge Reason is Other, the Other (Discharge Reason) single select drop down field is displayed which is a required field
+","Validated
+",,,,,,,
+,,,"7","Validate Notes is a text field which only allows 10000 characters by attempting to add more and receiving an error message
+","Validated",,,,,,,
+,,,"8","Fill in data in all the required fields and click on Continue","A confirmation modal displays with the text: ""You are about to unassign location from the selected member records. Would you like to continue?""
+",,,,,,,
+,,,"9","Click on Continue and validate the status of the assignment is displayed","Validated",,,,,,,
+,,,"10","Click on the Close button and validate the changes are applied as per the status in step 9","Validated
+",,,,,,,
+,,,"11","Logout of the testing environment
+","User is logged out
+",,,,,,,
+"556263","Test Case","[Bulk Assignments] Validate the fields in Staff Member Bulk Unassignments and validate the user can unassign the staff",,,,"Automated","DC-ST\Carity\Core","Tue Apr 29 2025 13:34:12 GMT+0000 (Coordinated Universal Time)","Swetha Jangili <FEI\swetha.jangili>","Wed Feb 23 2022 19:22:53 GMT+0000 (Coordinated Universal Time)","Ready","BulkAssignmentsModule; Carity_STD_RegressionTest; InSuite; StdRAutomated"
+,,,"1","Login to the test environment
+","User is logged in and the Home page displays
+",,,,,,,
+,,,"2","Navigate to the 3 dot ellipsis menu and click Bulk Assignments","The Bulk Assignments List page displays",,,,,,,
+,,,"3","Fill in the required fields as desired for the test and click on Run Query","Bulk Assignments List page displays with the filtered records
+",,,,,,,
+,,,"4","Select 1 or more records and click on the Unassign Staff button in the Bulk Assignments list","Staff Member Bulk Unassignments modal displays",,,,,,,
+,,,"5","Validate the Unassign Reason is a required field which is a single select drop down that displays the below values:
+ 
+Deceased
+Department involuntarily ends services/ termination due to no contact
+Moved out of State and chose to terminate services
+Moved to Nursing Facility
+No longer chooses to receive services
+No longer eligible for Medicaid
+Other
+Services not used
+Termination of Gx/Cx and does not receive services
+","Validated",,,,,,,
+,,,"6","Validate if Unassign Reason is Other, the Other (Unassign Reason) single select drop down field is displayed which is a required field
+","Validated",,,,,,,
+,,,"7","Validate Notes is a text field which only allows 10000 characters by attempting to add more and receiving an error message
+","Validated
+",,,,,,,
+,,,"8","Fill in data in all the required fields and click on Continue
+","A confirmation modal displays with the text: ""You are about to unassign staff member from the selected member records. Would you like to continue?""
+",,,,,,,
+,,,"9","Click on Continue and validate the status of the assignment is displayed
+","Validated",,,,,,,
+,,,"10","Click on the Close button and validate the changes are applied as per the status in step 9","Validated
+",,,,,,,
+,,,"11","Logout of the testing environment
+","User is logged out
+",,,,,,,
