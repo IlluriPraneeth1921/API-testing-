@@ -2,7 +2,7 @@ import { Given, When, Then } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
 import type { PWWorld } from "@src/core/world";
 import { LoginKeywords } from "@src/keywords/LoginKeywords";
-import { env } from "@src/config/env";
+import { HeaderLocators } from "@src/locators";
 
 Given("I login with username {string} and password {string}", async function (this: PWWorld, u: string, p: string) {
   const kw = new LoginKeywords(this.page);
@@ -10,7 +10,7 @@ Given("I login with username {string} and password {string}", async function (th
 });
 
 Then("I should see the dashboard", async function (this: PWWorld) {
-  const headerContainer = this.page.locator("[aria-label='primary-layout-header-container']");
+  const headerContainer = this.page.locator(HeaderLocators.container);
   await headerContainer.waitFor({ state: 'visible', timeout: 30000 });
   await expect(headerContainer).toBeVisible();
   await expect(this.page).toHaveURL(/choose-context/, { timeout: 10000 });
@@ -23,7 +23,7 @@ When("I navigate to Administration tab", async function (this: PWWorld) {
 });
 
 Then("I should see all administration sections", async function (this: PWWorld) {
-  const adminTab = this.page.locator("span:text-is('Administration')").first();
+  const adminTab = this.page.locator(HeaderLocators.administrationTab).first();
   await expect(adminTab).toBeVisible();
 });
 

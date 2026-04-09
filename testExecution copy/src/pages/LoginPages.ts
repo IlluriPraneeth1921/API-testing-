@@ -82,31 +82,29 @@ export class LoginPage {
     // Position 1 = Organization, Position 2 = Location, Position 3 = Staff
     const combobox = this.page.locator(LoginLocators.combobox).nth(position - 1);
     await combobox.click({ force: true });
-    await this.page.waitForTimeout(1000); // Increased from 500ms
-    await combobox.type(value, { delay: 150 }); // Increased delay from 100ms
-    await this.page.waitForTimeout(3000); // Increased from 2000ms - wait for dropdown to populate
+    await this.page.waitForTimeout(500);
+    await combobox.type(value, { delay: 100 });
+    await this.page.waitForTimeout(2000);
     await this.page.keyboard.press('ArrowDown');
-    await this.page.waitForTimeout(1000); // Increased from 500ms
+    await this.page.waitForTimeout(500);
     await this.page.keyboard.press('Enter');
-    await this.page.waitForTimeout(2000); // Increased from 1500ms
+    await this.page.waitForTimeout(1500);
     console.log(`[LOGIN] Selected "${value}"`);
   }
 
   async selectOrganization(org: string) {
-    await this.page.locator(LoginLocators.organizationLabel).waitFor({ state: 'visible', timeout: 60000 }); // Increased from 30000ms
-    await this.page.waitForTimeout(2000); // Increased from 1000ms
+    await this.page.locator(LoginLocators.organizationLabel).waitFor({ state: 'visible', timeout: 60000 });
+    await this.page.waitForTimeout(1000);
     await this.selectDropdownValue(org, 1);
     await this.page.screenshot({ path: `${this.screenshotDir}/05-organization-selected.png` });
   }
 
   async selectLocation(location: string) {
-    await this.page.waitForTimeout(1000); // Added wait before location selection
     await this.selectDropdownValue(location, 2);
     await this.page.screenshot({ path: `${this.screenshotDir}/06-location-selected.png` });
   }
 
   async selectStaffMember(staff: string) {
-    await this.page.waitForTimeout(1000); // Added wait before staff selection
     await this.selectDropdownValue(staff, 3);
     await this.page.screenshot({ path: `${this.screenshotDir}/07-staff-selected.png` });
   }

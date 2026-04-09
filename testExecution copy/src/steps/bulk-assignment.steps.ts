@@ -15,86 +15,20 @@ let initialGridData: string = '';
 Given('I navigate to Bulk Assignments via the ellipsis menu', async function() {
   bulkAssignmentPage = new BulkAssignmentPage(this.page);
   
-  // Try multiple navigation approaches
-  let navigated = false;
-  
-  // First, dismiss any overlays that might be present
-  try {
-    await this.page.keyboard.press('Escape');
-    await this.page.waitForTimeout(500);
-  } catch (e) {
-    // Ignore
+  // Check if "Bulk Assignments" button is directly visible in the toolbar
+  const directBtn = this.page.locator('button:has-text("Bulk Assignments")').first();
+  if (await directBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await directBtn.click();
+  } else {
+    // Hidden behind ellipsis overflow menu
+    const headerEllipsis = this.page.locator('button[aria-label="more options"]').first();
+    await headerEllipsis.waitFor({ state: 'visible', timeout: 10000 });
+    await headerEllipsis.click();
+    await this.page.waitForSelector('.cdk-overlay-container [role="menu"]', { state: 'visible', timeout: 5000 });
+    await this.page.locator('.cdk-overlay-container [role="menu"] [role="menuitem"]').filter({ hasText: 'Bulk Assignments' }).first().click();
   }
   
-  // Approach 1: Click the more options (ellipsis) menu button
-  console.log('[BULK_ASSIGNMENT] Approach 1: Clicking more options menu');
-  try {
-    const moreOptionsBtn = this.page.locator('[aria-label="more options"]');
-    await moreOptionsBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await moreOptionsBtn.click({ force: true });
-    await this.page.waitForTimeout(1000);
-    
-    // Look for Bulk Assignments in the menu - scroll menu if needed
-    const bulkAssignmentMenuItem = this.page.locator('[role="menuitem"]:has-text("Bulk Assignments"), button:has-text("Bulk Assignments"), a:has-text("Bulk Assignments")').first();
-    
-    if (await bulkAssignmentMenuItem.count() > 0) {
-      // Scroll the menu item into view before clicking
-      await bulkAssignmentMenuItem.scrollIntoViewIfNeeded();
-      await bulkAssignmentMenuItem.click({ force: true });
-      navigated = true;
-      console.log('[BULK_ASSIGNMENT] Navigated via ellipsis menu');
-    } else {
-      await this.page.keyboard.press('Escape'); // Close menu
-    }
-  } catch (e) {
-    console.log('[BULK_ASSIGNMENT] Ellipsis menu approach failed:', e);
-    await this.page.keyboard.press('Escape'); // Close any open menu
-  }
-  
-  // Approach 2: Try Administration tab navigation
-  if (!navigated) {
-    console.log('[BULK_ASSIGNMENT] Approach 2: Trying Administration tab');
-    try {
-      await this.page.locator("span:text-is('Administration')").click({ force: true });
-      await this.page.waitForTimeout(1000);
-      
-      const bulkLink = this.page.locator('a:has-text("Bulk Assignments"), button:has-text("Bulk Assignments")').first();
-      if (await bulkLink.count() > 0) {
-        await bulkLink.scrollIntoViewIfNeeded();
-        await bulkLink.click({ force: true });
-        navigated = true;
-        console.log('[BULK_ASSIGNMENT] Navigated via Administration tab');
-      }
-    } catch (e) {
-      console.log('[BULK_ASSIGNMENT] Administration tab approach failed:', e);
-    }
-  }
-  
-  // Approach 3: Direct URL navigation as last resort
-  if (!navigated) {
-    console.log('[BULK_ASSIGNMENT] Approach 3: Direct URL navigation');
-    const currentUrl = this.page.url();
-    const baseUrl = currentUrl.split('#')[0];
-    await this.page.goto(`${baseUrl}#/bulk-assignments`);
-    console.log('[BULK_ASSIGNMENT] Navigated via direct URL');
-  }
-  
-  // Wait for page to load with longer timeout
-  await this.page.waitForTimeout(3000);
-  
-  // Try to verify page loaded, if fails use direct URL
-  try {
-    await bulkAssignmentPage.verifyPageLoaded();
-    console.log('[BULK_ASSIGNMENT] Navigation complete - page verified');
-  } catch (e) {
-    console.log('[BULK_ASSIGNMENT] Page verification failed, trying direct URL');
-    const currentUrl = this.page.url();
-    const baseUrl = currentUrl.split('#')[0];
-    await this.page.goto(`${baseUrl}#/bulk-assignments`);
-    await this.page.waitForTimeout(3000);
-    await bulkAssignmentPage.verifyPageLoaded();
-    console.log('[BULK_ASSIGNMENT] Navigation complete via fallback URL');
-  }
+  await bulkAssignmentPage.verifyPageLoaded();
 });
 
 Given('I am on the Bulk Assignments page', async function() {
