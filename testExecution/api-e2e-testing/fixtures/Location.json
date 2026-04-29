@@ -1,0 +1,161 @@
+{
+  "businessProfile": {
+    "doingBusinessAsName": "${strBusinessName}",
+    "fullName": "${strFullName}",
+    "note": "Note1",
+    "shortName": "${strShortName}",
+    "websiteUrlAddress": "https://testurl.com"
+  },
+  "contractedEmergencyTransitionHousingBedCount": 10,
+  "externalStatus": {
+    "code": "4400001",
+    "codeSystemIdentifier": "1",
+    "name": "Active"
+  },
+  "locationAddresses": [
+    {
+      "cityName": "city1",
+      "country": null,
+      "countyArea": {
+        "code": "900001",
+        "codeSystemIdentifier": "1",
+        "name": "Autauga County"
+      },
+      "current": {
+        "code": "6500002",
+        "codeSystemIdentifier": "1",
+        "name": "Yes"
+      },
+      "firstStreetAddress": "add1",
+      "isActive": true,
+      "isPrimary": true,
+      "note": "note1",
+      "physicalAddressType": {
+        "code": "500003",
+        "codeSystemIdentifier": "1",
+        "name": "Physical"
+      },
+      "postalCode": "12345",
+      "secondStreetAddress": "add2",
+      "stateProvince": {
+        "code": "800001",
+        "codeSystemIdentifier": "1",
+        "name": "Alabama"
+      },
+      "verificationStatus": null
+    }
+  ],
+  "locationEmailAddresses": [
+    {
+      "email": "test1@test.com",
+      "isPrimary": false,
+      "note": "note1"
+    },
+	{
+      "email": "test2@test.com",
+      "isPrimary": true,
+      "note": "note2"
+    }
+  ],
+  "locationIdentifiers": [
+    {
+      "effectiveDateRange": {
+        "endDate": "2023-02-23",
+        "startDate": "2023-02-23"
+      },
+      "note": "note1",
+      "type": {
+        "code": "1000004",
+        "codeSystemIdentifier": "1",
+        "name": "Tax ID"
+      },
+      "value": "1234512341"
+    },
+	{
+      "effectiveDateRange": {
+        "endDate": "2023-02-23",
+        "startDate": "2023-02-23"
+      },
+      "note": "note2",
+      "type": {
+        "code": "1000010",
+        "codeSystemIdentifier": "1",
+        "name": "VendorCode"
+      },
+      "value": "1234512342"
+    },
+	{
+      "effectiveDateRange": {
+        "endDate": "2023-02-23",
+        "startDate": "2023-02-23"
+      },
+      "note": "note3",
+      "type": {
+        "code": "1000003",
+        "codeSystemIdentifier": "1",
+        "name": "ProviderNumber"
+      },
+      "value": "1234512343"
+    },
+	{
+      "effectiveDateRange": {
+        "endDate": "2023-02-23",
+        "startDate": "2023-02-23"
+      },
+      "note": "note4",
+      "type": {
+        "code": "1000005",
+        "codeSystemIdentifier": "1",
+        "name": "NPI"
+      },
+      "value": "1234512344"
+    },
+	{
+      "effectiveDateRange": {
+        "endDate": "2023-02-23",
+        "startDate": "2023-02-23"
+      },
+      "note": "note5",
+      "type": {
+        "code": "1000006",
+        "codeSystemIdentifier": "1",
+        "name": "FEIN"
+      },
+      "value": "1234512345"
+    }
+  ],
+  "locationPhones": [
+    {
+      "extension": "12345",
+      "isPrimary": false,
+      "isTextTelephone": true,
+      "note": "Note1",
+      "number": "1 (234) 567-6777",
+      "phoneType": {
+        "code": "400009",
+        "codeSystemIdentifier": "1",
+        "name": "Facility"
+      }
+    },
+	{
+      "extension": "12346",
+      "isPrimary": true,
+      "isTextTelephone": true,
+      "note": "Note2",
+      "number": "1 (234) 567-6778",
+      "phoneType": {
+        "code": "400009",
+        "codeSystemIdentifier": "1",
+        "name": "Facility"
+      }
+    }
+  ],
+  "organizationKey": "${strOrganizationKey}",
+  "status": {
+    "code": "4400001",
+    "codeSystemIdentifier": "1",
+    "name": "Active"
+  },
+  "totalAvailableBedCount": 20,
+  "totalBedCount": 30
+}

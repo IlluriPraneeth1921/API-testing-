@@ -91,6 +91,12 @@ export const BulkAssignmentLocators = {
   assignmentStatus: '.assignment-status, .status-message',
   progressIndicator: 'mat-progress-bar, mat-spinner',
   
+  // ═══ SELECT ALL RECORDS (PBI 915981 - should never display) ═══
+  selectAllRecordsBtn: 'button:has-text("Select All Records")',
+  
+  // ═══ CHECKED CHECKBOX STATE ═══
+  checkedCheckbox: 'mat-checkbox.mat-mdc-checkbox-checked input[type="checkbox"]',
+  
 } as const;
 
 export type BulkAssignmentLocatorKeys = keyof typeof BulkAssignmentLocators;

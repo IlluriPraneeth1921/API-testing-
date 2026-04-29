@@ -1,0 +1,121 @@
+# Azure Pipelines — API E2E Regression
+#
+# Modes:
+#   - Single file:  set EXCEL parameter (e.g. 609768_Appointment.xlsx)
+#   - Module:       set MODULE parameter (e.g. OrganizationModule)
+#   - Full:         leave EXCEL + MODULE empty → runs all 170 files
+#   - Sharded:      set SHARD_TOTAL > 1 → splits across parallel agents
+#
+# Artifacts: HTML report + CSV results published per shard
+
+trigger: none  # manual or scheduled only
+
+pr: none
+
+parameters:
+  - name: environment
+    displayName: 'Target Environment'
+    type: string
+    default: 'DevF1'
+    values: ['DevF1', 'F1', 'F5']
+
+  - name: excel
+    displayName: 'Excel file (blank = all)'
+    type: string
+    default: ''
+
+  - name: module
+    displayName: 'Module filter (blank = all)'
+    type: string
+    default: ''
+
+  - name: testType
+    displayName: 'Test type filter'
+    type: string
+    default: ''
+    values: ['', 'happy', 'negative', 'search', 'error', 'combo']
+
+  - name: maxScenarios
+    displayName: 'Max scenarios per sheet (0 = all)'
+    type: number
+    default: 0
+
+  - name: skipSql
+    displayName: 'Skip SQL lookups'
+    type: boolean
+    default: false
+
+  - name: workers
+    displayName: 'Playwright workers per agent'
+    type: number
+    default: 1
+
+  - name: shardTotal
+    displayName: 'Number of shards (parallel agents)'
+    type: number
+    default: 1
+
+variables:
+  nodeVersion: '20.x'
+  workDir: 'tests/api-e2e-testing'
+
+stages:
+  - stage: E2E_Tests
+    displayName: 'API E2E Tests — ${{ parameters.environment }}'
+    jobs:
+      - ${{ each shard in split('1,2,3,4,5,6,7,8', ',') }}:
+        - ${{ if le(shard, parameters.shardTotal) }}:
+          - job: Shard_${{ shard }}
+            displayName: 'Shard ${{ shard }}/${{ parameters.shardTotal }}'
+            pool:
+              vmImage: 'windows-latest'
+            timeoutInMinutes: 60
+            steps:
+              - task: NodeTool@0
+                displayName: 'Install Node.js'
+                inputs:
+                  versionSpec: $(nodeVersion)
+
+              - script: npm ci
+                displayName: 'Install dependencies'
+                workingDirectory: $(workDir)
+
+              - script: npx playwright install --with-deps
+                displayName: 'Install Playwright browsers'
+                workingDirectory: $(workDir)
+
+              - script: |
+                  set ENV_NAME=${{ parameters.environment }}
+                  ${{ if ne(parameters.excel, '') }}:
+                    set EXCEL=${{ parameters.excel }}
+                  ${{ if ne(parameters.module, '') }}:
+                    set MODULE=${{ parameters.module }}
+                  ${{ if ne(parameters.testType, '') }}:
+                    set TEST_TYPE=${{ parameters.testType }}
+                  ${{ if ne(parameters.maxScenarios, 0) }}:
+                    set MAX_SCENARIOS=${{ parameters.maxScenarios }}
+                  ${{ if eq(parameters.skipSql, true) }}:
+                    set SKIP_SQL=true
+                  npx playwright test excel-driven-e2e --workers=${{ parameters.workers }} --shard=${{ shard }}/${{ parameters.shardTotal }}
+                displayName: 'Run E2E Tests'
+                workingDirectory: $(workDir)
+                continueOnError: true
+
+              - task: PublishTestResults@2
+                displayName: 'Publish JUnit results'
+                condition: always()
+                inputs:
+                  testResultsFormat: 'JUnit'
+                  testResultsFiles: '$(workDir)/test-results/junit-results.xml'
+                  testRunTitle: 'API E2E — ${{ parameters.environment }} — Shard ${{ shard }}'
+                  mergeTestResults: true
+
+              - publish: $(workDir)/output
+                displayName: 'Publish CSV + HTML reports'
+                condition: always()
+                artifact: 'e2e-results-shard-${{ shard }}'
+
+              - publish: $(workDir)/playwright-report
+                displayName: 'Publish Playwright HTML report'
+                condition: always()
+                artifact: 'playwright-report-shard-${{ shard }}'

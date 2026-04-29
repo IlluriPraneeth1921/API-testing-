@@ -1,4 +1,4 @@
-TheTheimport type { Page } from "playwright";
+import type { Page } from "playwright";
 import { expect } from "@playwright/test";
 import { getRunTimestamp } from "@src/utils/timestamp";
 import { BulkAssignmentLocators } from "@src/locators/bulk-assignment.locators";
@@ -136,7 +136,7 @@ export class BulkAssignmentPage {
     const count = await countLocator.count();
     if (count === 0) {
       // No selection indicator visible - count checked checkboxes instead
-      const checkedBoxes = await this.page.locator('mat-checkbox.mat-mdc-checkbox-checked input[type="checkbox"]').count();
+      const checkedBoxes = await this.page.locator(BulkAssignmentLocators.checkedCheckbox).count();
       return checkedBoxes;
     }
     const text = await countLocator.textContent({ timeout: 5000 }).catch(() => '');
@@ -243,7 +243,7 @@ export class BulkAssignmentPage {
   async verifySelectAllButtonNotDisplayed() {
     // PBI 915981: Select All Records button should never display
     console.log('[BULK_ASSIGNMENT] Verifying Select All Records button not displayed');
-    await expect(this.page.locator('button:has-text("Select All Records")')).not.toBeVisible();
+    await expect(this.page.locator(BulkAssignmentLocators.selectAllRecordsBtn)).not.toBeVisible();
   }
 
   // ═══ COMPLETE WORKFLOWS ═══

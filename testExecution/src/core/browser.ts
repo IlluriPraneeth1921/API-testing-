@@ -4,8 +4,9 @@ import { env } from "@src/config/env";
 export async function launchBrowser(): Promise<Browser> {
 
   const launchOptions = {
-    headless: env.headless,   // ← controls UI mode
-    slowMo: env.headless ? 0 : 200   // slow actions when visible
+    headless: env.headless,
+    slowMo: env.headless ? 0 : 200,
+    args: ['--start-maximized']
   };
 
   if (env.browser === "firefox") {

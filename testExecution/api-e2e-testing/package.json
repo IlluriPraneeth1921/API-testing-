@@ -1,0 +1,52 @@
+{
+  "name": "api-e2e-testing",
+  "version": "1.0.0",
+  "description": "API E2E Testing: POST -> GET -> SQL Verification (Playwright + TypeScript)",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:devf1": "cross-env ENV_NAME=DevF1 npx playwright test",
+    "test:f1": "cross-env ENV_NAME=F1 npx playwright test",
+    "test:f5": "cross-env ENV_NAME=F5 npx playwright test",
+    "test:skip-post": "cross-env SKIP_POST=true npx playwright test",
+    "test:skip-sql": "cross-env SKIP_SQL=true npx playwright test",
+    "test:entity": "cross-env npx playwright test generic-module-e2e",
+    "test:org": "cross-env ENTITY=Organization npx playwright test generic-module-e2e",
+    "test:person": "cross-env ENTITY=Person npx playwright test generic-module-e2e",
+    "test:guardianship": "cross-env ENTITY=Guardianship npx playwright test generic-module-e2e",
+    "test:intake": "cross-env ENTITY=IntakeReferral npx playwright test generic-module-e2e",
+    "test:excel": "cross-env npx playwright test excel-driven-e2e",
+    "test:excel:file": "cross-env npx playwright test excel-driven-e2e",
+    "test:excel:smoke": "cross-env MAX_SCENARIOS=2 npx playwright test excel-driven-e2e",
+    "test:excel:negative": "cross-env TEST_TYPE=negative npx playwright test excel-driven-e2e",
+    "test:excel:search": "cross-env TEST_TYPE=search npx playwright test excel-driven-e2e",
+    "test:excel:nosql": "cross-env SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:excel:regression": "cross-env npx playwright test excel-driven-e2e",
+    "test:excel:parallel": "cross-env WORKERS=4 npx playwright test excel-driven-e2e",
+    "test:excel:shard": "npx playwright test excel-driven-e2e",
+    "test:devf1:org": "cross-env ENV_NAME=DevF1 EXCEL=728300_Organization.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:devf1:org:smoke": "cross-env ENV_NAME=DevF1 EXCEL=728300_Organization.xlsx SKIP_SQL=true MAX_SCENARIOS=2 npx playwright test excel-driven-e2e",
+    "test:devf1:org-module": "cross-env ENV_NAME=DevF1 SKIP_SQL=true npx playwright test org-module-e2e",
+    "test:devf1:person": "cross-env ENV_NAME=DevF1 EXCEL=614086_Person.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:devf1:person:smoke": "cross-env ENV_NAME=DevF1 EXCEL=614086_Person.xlsx SKIP_SQL=true MAX_SCENARIOS=2 npx playwright test excel-driven-e2e",
+    "test:devf1:note-module": "cross-env ENV_NAME=DevF1 SKIP_SQL=true npx playwright test note-module-e2e",
+    "test:devf1:general-note": "cross-env ENV_NAME=DevF1 EXCEL=648018_GeneralNote.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:devf1:case-note": "cross-env ENV_NAME=DevF1 EXCEL=745048_CaseNote.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:devf1:scratchpad-note": "cross-env ENV_NAME=DevF1 EXCEL=648024_ScratchpadNote.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "report": "npx playwright show-report playwright-report"
+  },
+  "dependencies": {
+    "amazon-cognito-identity-js": "^6.3.16",
+    "msnodesqlv8": "^5.1.8",
+    "mssql": "^11.0.1",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/mssql": "^9.1.11",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.6.0"
+  }
+}

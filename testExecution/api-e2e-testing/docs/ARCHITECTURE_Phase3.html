@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API E2E Architecture — Phase 3: How To Run</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f7fa;color:#1a1a2e;line-height:1.6;padding:2rem}
+.container{max-width:1100px;margin:0 auto}
+h1{font-size:1.8rem;color:#0f3460;border-bottom:3px solid #e94560;padding-bottom:.5rem;margin-bottom:.5rem}
+.subtitle{color:#6c757d;font-size:.95rem;margin-bottom:2rem}
+h2{font-size:1.3rem;color:#16213e;margin:2rem 0 1rem;padding:.5rem .8rem;background:#e8edf3;border-left:4px solid #e94560;border-radius:0 6px 6px 0}
+h3{font-size:1.1rem;color:#0f3460;margin:1.2rem 0 .6rem}
+.card{background:#fff;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+ul,ol{padding-left:1.5rem;margin:.5rem 0}
+li{margin:.3rem 0}
+strong{color:#e94560}
+code{background:#eef;padding:.15rem .4rem;border-radius:3px;font-size:.9em;font-family:'Cascadia Code','Fira Code',monospace}
+pre{background:#1a1a2e;color:#e0e0e0;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:.8rem 0}
+pre code{background:none;padding:0;color:inherit}
+table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.88rem}
+th{background:#0f3460;color:#fff;padding:.6rem .8rem;text-align:left;font-weight:600}
+td{padding:.5rem .8rem;border-bottom:1px solid #e8edf3}
+tr:nth-child(even){background:#f8f9fb}
+tr:hover{background:#e8edf3}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:12px;font-size:.75rem;font-weight:600;margin-right:.3rem}
+.badge-phase{background:#e94560;color:#fff}
+.badge-mode{background:#2d6a4f;color:#fff}
+.nav{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.nav a{padding:.4rem 1rem;background:#0f3460;color:#fff;border-radius:20px;text-decoration:none;font-size:.85rem}
+.nav a.active{background:#e94560}
+.nav a:hover{opacity:.85}
+.cmd{background:#16213e;color:#a8d8ea;padding:.8rem 1rem;border-radius:6px;font-family:'Cascadia Code','Fira Code',monospace;font-size:.85rem;margin:.5rem 0;overflow-x:auto}
+.tree{background:#1a1a2e;color:#a8d8ea;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.78rem;line-height:1.45;font-family:'Cascadia Code','Fira Code',monospace;white-space:pre;margin:.8rem 0}
+.report-mock{background:#16213e;color:#e0e0e0;padding:1.2rem;border-radius:6px;overflow-x:auto;font-size:.76rem;line-height:1.4;font-family:'Cascadia Code','Fira Code',monospace;white-space:pre;margin:.8rem 0}
+.pass{color:#4caf50}.fail{color:#ef5350}.warn{color:#ffc107}
+.kw{color:#c792ea}.str{color:#c3e88d}.cm{color:#546e7a}.fn{color:#82aaff}
+footer{text-align:center;color:#999;font-size:.8rem;margin-top:3rem;padding-top:1rem;border-top:1px solid #ddd}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1><span class="badge badge-phase">Phase 3</span> API E2E Testing Framework — How To Run</h1>
+<p class="subtitle">5 execution modes, filtering options, parallel strategy, and output structure.</p>
+
+<div class="nav">
+  <a href="ARCHITECTURE_Phase1.html">Phase 1: Overview</a>
+  <a href="ARCHITECTURE_Phase2.html">Phase 2: How It Works</a>
+  <a class="active" href="ARCHITECTURE_Phase3.html">Phase 3: How To Run</a>
+</div>
+
+<!-- 5 EXECUTION MODES -->
+<h2>5 Execution Modes</h2>
+
+<div class="card">
+  <h3><span class="badge badge-mode">Mode 1</span> Single Excel File</h3>
+  <div class="cmd">EXCEL=609768_Appointment.xlsx npx playwright test excel-driven-e2e</div>
+  <div class="cmd">TFS=609768 npx playwright test excel-driven-e2e</div>
+<div class="tree">609768_Appointment.xlsx
+  ├── 609768_001_TC001 (8 rows)  → POST Happy Path    → 8 tests
+  ├── 609768_001_TC002 (39 rows) → POST Negative       → 39 tests
+  ├── 609768_002_TC001 (8 rows)  → PUT Happy Path      → 8 tests
+  ├── 609768_002_TC002 (35 rows) → PUT Negative         → 35 tests
+  └── 609768_003_TC001 (17 rows) → GET Search           → 17 tests
+
+Total: 107 tests from 1 Excel file</div>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-mode">Mode 2</span> Single Aggregate</h3>
+  <div class="cmd">AGGREGATE=Location npx playwright test excel-driven-e2e</div>
+  <p>Resolves to all Location-related Excel files:</p>
+<div class="tree">Location Aggregate
+  ├── 727573_Location.xlsx (18 sheets)
+  ├── 612015_LocationExternal_LocationAssignment.xlsx (6 sheets)
+  ├── 612017_LocationExternal_StaffMemberAssignment.xlsx (6 sheets)
+  └── 609773_LocationAttachment.xlsx (6 sheets)</div>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-mode">Mode 3</span> Single Module</h3>
+  <div class="cmd">MODULE=OrganizationModule npx playwright test excel-driven-e2e</div>
+  <p>Resolves to 5 aggregates, 17 Excel files, 112 sheets:</p>
+<div class="tree">OrganizationModule
+  ├── Organization (6 files) → 728300, 613460, 613466, 613467, 613472, 613476
+  ├── Location (4 files)     → 727573, 612015, 612017, 609773
+  ├── StaffMember (4 files)  → 727911, 609777, 613501, 729124
+  ├── StaffDelegation (1)    → 729123
+  └── PaymentSuspension (1)  → 923178</div>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-mode">Mode 4</span> Multiple Modules / Suite</h3>
+  <div class="cmd">MODULE=OrganizationModule,NoteModule,SecurityModule npx playwright test excel-driven-e2e</div>
+  <div class="cmd">SUITE=core npx playwright test excel-driven-e2e</div>
+  <p>Predefined suites in <code>config/suites.json</code>:</p>
+  <table>
+    <thead><tr><th>Suite</th><th>Modules</th></tr></thead>
+    <tbody>
+      <tr><td><code>core</code></td><td>OrganizationModule, PersonModule, CaseModule, SecurityModule</td></tr>
+      <tr><td><code>clinical</code></td><td>NoteModule, HealthInformationModule, CrisisModule, GuardianshipModule, PersonCenteredPlanModule</td></tr>
+      <tr><td><code>financial</code></td><td>RateModule, ServiceAuthorizationModule, ServiceDefinitionModule, ContractModule</td></tr>
+      <tr><td><code>protective</code></td><td>ProtectiveServicesModule, GuardianshipModule, SafetyDevicePacketModule</td></tr>
+      <tr><td><code>program</code></td><td>ProgramModule, ProgramEnrollmentModule, ProgramApplicationModule, WaitlistModule</td></tr>
+      <tr><td><code>communication</code></td><td>NotificationModule, MessageModule, LetterModule</td></tr>
+      <tr><td><code>smoke</code></td><td>OrganizationModule, PersonModule, NoteModule</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-mode">Mode 5</span> Full Regression</h3>
+  <div class="cmd">npx playwright test excel-driven-e2e</div>
+  <div class="cmd">npx playwright test excel-driven-e2e --workers=4</div>
+  <div class="cmd">ENV_NAME=F1 npx playwright test excel-driven-e2e</div>
+  <p>Runs all <strong>45 modules</strong>, <strong>170 files</strong>, <strong>~1,100 sheets</strong>.</p>
+</div>
+
+<!-- FILTERING -->
+<h2>Filtering Options (Cross-cutting)</h2>
+<div class="card">
+  <p>These work with <strong>any</strong> execution mode:</p>
+  <table>
+    <thead><tr><th>Flag</th><th>Effect</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>SKIP_HAPPY=true</code></td><td>Skip POST happy path — only negative + search + error</td><td><code>SKIP_HAPPY=true MODULE=NoteModule npx playwright test</code></td></tr>
+      <tr><td><code>SKIP_SQL=true</code></td><td>Skip SQL prerequisite lookup — use generated values only</td><td><code>SKIP_SQL=true AGGREGATE=Appointment npx playwright test</code></td></tr>
+      <tr><td><code>TEST_TYPE=negative</code></td><td>Only run negative tests</td><td><code>TEST_TYPE=negative EXCEL=609768_Appointment.xlsx npx playwright test</code></td></tr>
+      <tr><td><code>TEST_TYPE=search</code></td><td>Only run search tests</td><td><code>TEST_TYPE=search MODULE=OrganizationModule npx playwright test</code></td></tr>
+      <tr><td><code>TEST_TYPE=error</code></td><td>Only run error code tests</td><td><code>TEST_TYPE=error MODULE=AttachmentModule npx playwright test</code></td></tr>
+      <tr><td><code>ENTITY_KEY=abc-123</code></td><td>Use existing key — skip POST, go straight to PUT/GET</td><td><code>ENTITY_KEY=abc-123 EXCEL=609768_Appointment.xlsx npx playwright test</code></td></tr>
+      <tr><td><code>ENV_NAME=F1</code></td><td>Target specific environment</td><td><code>ENV_NAME=F1 SUITE=core npx playwright test</code></td></tr>
+      <tr><td><code>MAX_SCENARIOS=3</code></td><td>Limit scenarios per sheet (quick smoke)</td><td><code>MAX_SCENARIOS=3 npx playwright test</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- NPM SCRIPTS -->
+<h2>package.json Scripts</h2>
+<div class="card">
+<pre><code>{
+  "scripts": {
+    "test":              "npx playwright test excel-driven-e2e",
+    "test:smoke":        "cross-env SUITE=smoke MAX_SCENARIOS=2 npx playwright test excel-driven-e2e",
+    "test:core":         "cross-env SUITE=core npx playwright test excel-driven-e2e",
+    "test:clinical":     "cross-env SUITE=clinical npx playwright test excel-driven-e2e",
+    "test:negative-only":"cross-env TEST_TYPE=negative npx playwright test excel-driven-e2e",
+    "test:search-only":  "cross-env TEST_TYPE=search npx playwright test excel-driven-e2e",
+    "test:devf1":        "cross-env ENV_NAME=DevF1 npx playwright test excel-driven-e2e",
+    "test:f1":           "cross-env ENV_NAME=F1 npx playwright test excel-driven-e2e",
+    "test:f5":           "cross-env ENV_NAME=F5 npx playwright test excel-driven-e2e",
+    "registry:build":    "npx ts-node lib/discovery/registry-builder.ts"
+  }
+}</code></pre>
+</div>
+
+<!-- PARALLEL -->
+<h2>Parallel Execution Strategy</h2>
+<div class="card">
+  <div class="cmd">npx playwright test excel-driven-e2e --workers=4</div>
+  <div class="cmd">npx playwright test excel-driven-e2e --shard=1/3  <span style="color:#546e7a"># CI agent 1 of 3</span></div>
+  <p><strong>Dependency handling:</strong> Each Excel file's happy path POST runs first (serial within file), then negative/search/error tests can run in any order.</p>
+<pre><code><span class="cm">// Within each Excel file:</span>
+test.describe.serial(<span class="str">`${file} — Setup`</span>, () =&gt; {
+  <span class="cm">// 001_TC001 POST Happy Path — must run first to get entity key</span>
+  test(<span class="str">'Scenario1 — POST with minimal fields'</span>, ...);
+});
+
+test.describe(<span class="str">`${file} — POST Negative`</span>, () =&gt; {
+  <span class="cm">// Can run in parallel with other describe blocks</span>
+  test(<span class="str">'Scenario1 — Missing Subject'</span>, ...);
+});
+
+test.describe(<span class="str">`${file} — GET Search`</span>, () =&gt; {
+  <span class="cm">// Can run in parallel</span>
+  test(<span class="str">'Scenario1 — Person Key Search'</span>, ...);
+});</code></pre>
+</div>
+
+<!-- TEST HIERARCHY -->
+<h2>Test Hierarchy (Playwright Structure)</h2>
+<div class="card">
+<div class="tree">test.describe("API E2E Regression")                          ← top level
+  └── test.describe("OrganizationModule")                    ← module
+        └── test.describe("Location")                        ← aggregate
+              └── test.describe("727573_Location.xlsx")       ← excel file
+                    ├── test.describe("001_TC001 POST Happy") ← sheet type
+                    │     ├── test("Scenario1")               ← individual test
+                    │     ├── test("Scenario2")
+                    │     └── test("Scenario8")
+                    ├── test.describe("001_TC002 POST Negative")
+                    │     ├── test("Scenario1 — Missing BusinessProfile")
+                    │     │     → POST {} → assert 400
+                    │     │     → assert "The BusinessProfile field is required."
+                    │     └── test("Scenario2 — Missing FullName")
+                    ├── test.describe("002_TC003 Sub: Contact Combo")
+                    │     └── test("Scenario1")
+                    │           → PUT /location/{key}/contact → assert 200
+                    │           → GET /location/{key}/contacts → assert count = 1
+                    └── test.describe("007_TC001 GET Search")
+                          └── test("Scenario1 — Search with ShortName")</div>
+</div>
+
+<!-- OUTPUT -->
+<h2>Test Output Per Run</h2>
+<div class="card">
+  <h3>Single File Run</h3>
+<div class="tree">output/Appointment_E2E_2026-04-22T1430/
+├── 00_keys.json                    # All resolved variables + entity keys
+├── 01_create_results.csv           # POST happy: Scenario, Status, Key, Pass/Fail
+├── 02_negative_results.csv         # Negative: ExpectedStatus, ActualStatus,
+│                                   #   ExpectedMessage, ActualMessage, Pass/Fail
+├── 03_search_results.csv           # Search: URL, ExpectedCount, ActualCount, Pass/Fail
+├── 04_error_code_results.csv       # Errors: ExpectedStatus, ExpectedMessage, Pass/Fail
+├── 05_combo_results.csv            # Combo: PutStatus, GetStatus, GetCount, Pass/Fail
+└── 06_summary.json                 # { total, passed, failed, byType }</div>
+
+  <h3>Module / Suite / Regression Run</h3>
+<div class="tree">output/Regression_F1_2026-04-22T1430/
+├── 00_run_config.json
+├── OrganizationModule/
+│   ├── Organization/
+│   │   ├── 728300_Organization/  (csv files per test type)
+│   │   └── 613460_OrganizationCustomFormInstance/
+│   ├── Location/
+│   │   └── 727573_Location/
+│   └── module_summary.json
+├── NoteModule/
+│   └── ...
+├── regression_summary.json
+└── regression_report.html          # Standalone HTML dashboard</div>
+</div>
+
+<!-- HTML REPORT PREVIEW -->
+<h2>Regression HTML Report Preview</h2>
+<div class="card">
+<div class="report-mock">┌─────────────────────────────────────────────────────────┐
+│  API E2E Regression Report — F1 — 2026-04-22           │
+│  Total: 4,200 tests | <span class="pass">✅ 3,800 passed</span> | <span class="fail">❌ 400 failed</span>  │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─ OrganizationModule ──────── <span class="pass">95%</span> ████████████░ ──┐  │
+│  │  Organization    <span class="pass">98%</span> ██████████░  (120/122)      │  │
+│  │  Location        <span class="warn">92%</span> █████████░░  (180/196)      │  │
+│  │  StaffMember     <span class="pass">94%</span> █████████░░  (85/90)        │  │
+│  │  StaffDelegation <span class="pass">100%</span> ███████████ (12/12)        │  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                         │
+│  ┌─ NoteModule ──────────────── <span class="warn">88%</span> ████████░░░ ──┐   │
+│  │  GeneralNote     <span class="pass">100%</span> ███████████ (30/30)       │   │
+│  │  CrisisContact   <span class="fail">75%</span> ███████░░░░ (24/32)        │   │
+│  │  ▼ Failed: Scenario3 POST Negative              │   │
+│  │    Expected: 400 "The CaseKey field is required" │   │
+│  │    Actual:   400 "CaseKey is required"           │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘</div>
+</div>
+
+<!-- EXECUTION RESOLUTION -->
+<h2>Execution Resolution Logic</h2>
+<div class="card">
+<pre><code><span class="kw">function</span> <span class="fn">resolveExcelFiles</span>(): { module: <span class="kw">string</span>; aggregate: <span class="kw">string</span>; file: <span class="kw">string</span> }[] {
+  <span class="kw">const</span> registry = <span class="fn">loadModuleRegistry</span>();  <span class="cm">// config/module-registry.json</span>
+  <span class="kw">const</span> suites = <span class="fn">loadSuites</span>();            <span class="cm">// config/suites.json</span>
+
+  <span class="cm">// Mode 1: Single Excel file</span>
+  <span class="kw">if</span> (process.env.EXCEL) <span class="kw">return</span> [<span class="fn">findFileInRegistry</span>(registry, process.env.EXCEL)];
+  <span class="kw">if</span> (process.env.TFS)   <span class="kw">return</span> [<span class="fn">findByTfsId</span>(registry, process.env.TFS)];
+
+  <span class="cm">// Mode 2: Single Aggregate</span>
+  <span class="kw">if</span> (process.env.AGGREGATE) <span class="kw">return</span> <span class="fn">getAllFilesForAggregate</span>(registry, process.env.AGGREGATE);
+
+  <span class="cm">// Mode 3: Single Module</span>
+  <span class="kw">if</span> (process.env.MODULE &amp;&amp; !process.env.MODULE.<span class="fn">includes</span>(<span class="str">','</span>))
+    <span class="kw">return</span> <span class="fn">getAllFilesForModule</span>(registry, process.env.MODULE);
+
+  <span class="cm">// Mode 4: Multiple Modules or Suite</span>
+  <span class="kw">if</span> (process.env.MODULE &amp;&amp; process.env.MODULE.<span class="fn">includes</span>(<span class="str">','</span>))
+    <span class="kw">return</span> process.env.MODULE.<span class="fn">split</span>(<span class="str">','</span>).<span class="fn">flatMap</span>(m =&gt; <span class="fn">getAllFilesForModule</span>(registry, m.<span class="fn">trim</span>()));
+  <span class="kw">if</span> (process.env.SUITE)
+    <span class="kw">return</span> (suites[process.env.SUITE] || []).<span class="fn">flatMap</span>(m =&gt; <span class="fn">getAllFilesForModule</span>(registry, m));
+
+  <span class="cm">// Mode 5: Full Regression</span>
+  <span class="kw">return</span> <span class="fn">getAllFiles</span>(registry);
+}</code></pre>
+</div>
+
+<footer>API E2E Testing Framework Architecture — Phase 3 of 3</footer>
+</div>
+</body>
+</html>
