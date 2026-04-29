@@ -13,7 +13,6 @@ export class LoginPage {
   async open() {
     console.log(`[LOGIN] Opening URL: ${env.baseUrl}`);
     await this.page.goto(env.baseUrl, { waitUntil: "domcontentloaded" });
-    await this.page.setViewportSize({ width: 1920, height: 1080 });
     await this.page.waitForTimeout(2000);
     await this.page.screenshot({ path: `${this.screenshotDir}/01-login-page.png` });
     console.log('[LOGIN] Login page loaded');

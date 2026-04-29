@@ -2,10 +2,11 @@ import { Before, After, Status, AfterAll } from "@cucumber/cucumber";
 import { launchBrowser } from "@src/core/browser";
 import type { PWWorld } from "@src/core/world";
 import { generateReport, recordScenario } from "@src/utils/report-generator";
+import { getBrowserContextOptions, applyPageZoom, ACTIVE_VIEWPORT } from "../../viewport-config";
 
 Before(async function (this: PWWorld) {
   this.browser = await launchBrowser();
-  this.context = await this.browser.newContext();
+  this.context = await this.browser.newContext({ viewport: null });
   this.page = await this.context.newPage();
 });
 

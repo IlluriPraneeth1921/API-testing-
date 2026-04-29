@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API E2E Architecture — Phase 2: How It Works</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f7fa;color:#1a1a2e;line-height:1.6;padding:2rem}
+.container{max-width:1100px;margin:0 auto}
+h1{font-size:1.8rem;color:#0f3460;border-bottom:3px solid #e94560;padding-bottom:.5rem;margin-bottom:.5rem}
+.subtitle{color:#6c757d;font-size:.95rem;margin-bottom:2rem}
+h2{font-size:1.3rem;color:#16213e;margin:2rem 0 1rem;padding:.5rem .8rem;background:#e8edf3;border-left:4px solid #e94560;border-radius:0 6px 6px 0}
+h3{font-size:1.1rem;color:#0f3460;margin:1.2rem 0 .6rem}
+.card{background:#fff;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+ul,ol{padding-left:1.5rem;margin:.5rem 0}
+li{margin:.3rem 0}
+strong{color:#e94560}
+code{background:#eef;padding:.15rem .4rem;border-radius:3px;font-size:.9em;font-family:'Cascadia Code','Fira Code',monospace}
+pre{background:#1a1a2e;color:#e0e0e0;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:.8rem 0}
+pre code{background:none;padding:0;color:inherit}
+table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.88rem}
+th{background:#0f3460;color:#fff;padding:.6rem .8rem;text-align:left;font-weight:600}
+td{padding:.5rem .8rem;border-bottom:1px solid #e8edf3}
+tr:nth-child(even){background:#f8f9fb}
+tr:hover{background:#e8edf3}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:12px;font-size:.75rem;font-weight:600;margin-right:.3rem}
+.badge-phase{background:#e94560;color:#fff}
+.badge-tier{background:#0f3460;color:#fff}
+.badge-src{background:#2d6a4f;color:#fff}
+.nav{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.nav a{padding:.4rem 1rem;background:#0f3460;color:#fff;border-radius:20px;text-decoration:none;font-size:.85rem}
+.nav a.active{background:#e94560}
+.nav a:hover{opacity:.85}
+.kw{color:#c792ea}.str{color:#c3e88d}.cm{color:#546e7a}.fn{color:#82aaff}.num{color:#f78c6c}
+footer{text-align:center;color:#999;font-size:.8rem;margin-top:3rem;padding-top:1rem;border-top:1px solid #ddd}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1><span class="badge badge-phase">Phase 2</span> API E2E Testing Framework — How It Works</h1>
+<p class="subtitle">Sheet classification, variable resolution, route discovery, and response validation.</p>
+
+<div class="nav">
+  <a href="ARCHITECTURE_Phase1.html">Phase 1: Overview</a>
+  <a class="active" href="ARCHITECTURE_Phase2.html">Phase 2: How It Works</a>
+  <a href="ARCHITECTURE_Phase3.html">Phase 3: How To Run</a>
+</div>
+
+<!-- SHEET CLASSIFICATION -->
+<h2>Sheet Classification Logic (excel-parser.ts)</h2>
+<div class="card">
+  <p>The parser classifies each sheet by its <strong>header pattern</strong>, not by sheet name:</p>
+  <table>
+    <thead>
+      <tr><th>Headers Present</th><th>Classification</th><th>Method</th><th>Assertion</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>RequestBody</code> + NO <code>UserMessage</code> + NO <code>StatusCode</code> (or 200)</td><td><strong>CreateHappy</strong></td><td>POST</td><td>status=200, extract key</td></tr>
+      <tr><td><code>RequestBody</code> + <code>UserMessage</code> + <code>StatusCode</code> (≠200)</td><td><strong>CreateNegative</strong></td><td>POST</td><td>status=StatusCode, body contains UserMessage</td></tr>
+      <tr><td><code>RequestBody</code> + <code>LogMessage</code> + <code>StatusCode</code>=200 (sheet <code>_002_*</code>)</td><td><strong>UpdateHappy</strong></td><td>PUT</td><td>status=200</td></tr>
+      <tr><td><code>RequestBody</code> + <code>UserMessage</code> + <code>StatusCode</code> (sheet <code>_002_*</code>)</td><td><strong>UpdateNegative</strong></td><td>PUT</td><td>status=StatusCode, body contains UserMessage</td></tr>
+      <tr><td><code>RequestURL</code> + <code>RecordCount</code></td><td><strong>SearchValidation</strong></td><td>GET</td><td>status=200, validate count</td></tr>
+      <tr><td><code>Resource</code> + <code>PrimaryKey</code> + <code>StatusCode</code> + <code>UserMessage</code></td><td><strong>ErrorCodeValidation</strong></td><td>GET/DELETE</td><td>status=StatusCode, body contains UserMessage</td></tr>
+      <tr><td><code>PutRequestUrl</code> + <code>GetRequestUrl</code> + <code>PutStatusCode</code> + <code>GetStatusCode</code></td><td><strong>ComboTest</strong></td><td>PUT→GET</td><td>both statuses match, GetRecordCount matches</td></tr>
+      <tr><td><code>PutRequestUrl</code> + <code>PutRemoveRequestUrl</code></td><td><strong>AddRemoveTest</strong></td><td>PUT add, PUT remove</td><td>both succeed</td></tr>
+      <tr><td><code>RequestBody</code> + <code>RequestUrl</code> + <code>StatusCode</code> (newer)</td><td><strong>SubEndpointHappy</strong></td><td>PUT to sub-url</td><td>status=StatusCode</td></tr>
+      <tr><td><code>RequestBody</code> + <code>RequestUrl</code> + <code>UserMessage</code> + <code>StatusCode</code></td><td><strong>SubEndpointNegative</strong></td><td>PUT to sub-url</td><td>status=StatusCode, body contains UserMessage</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- VARIABLE RESOLUTION -->
+<h2>Variable Resolution Strategy (variable-resolver.ts)</h2>
+
+<div class="card">
+  <h3><span class="badge badge-tier">Tier 1</span> SQL Lookup (no creation needed)</h3>
+  <p>Top 10 keys used across 90% of files. Fetch the <strong>latest existing record</strong> from SQL:</p>
+  <table>
+    <thead><tr><th>Variable</th><th>SQL Query</th><th>Used By</th></tr></thead>
+    <tbody>
+      <tr><td><code>strCaseKey</code></td><td><code>SELECT TOP 1 CaseKey FROM CaseModule.Case ORDER BY EntityCreatedTimestamp DESC</code></td><td>61 files</td></tr>
+      <tr><td><code>strPersonKey</code></td><td><code>SELECT TOP 1 PersonKey FROM PersonModule.Person ORDER BY ...</code></td><td>50 files</td></tr>
+      <tr><td><code>strLocationKey</code></td><td><code>SELECT TOP 1 LocationKey FROM OrganizationModule.Location ORDER BY ...</code></td><td>35 files</td></tr>
+      <tr><td><code>strProgramKey</code></td><td><code>SELECT TOP 1 ProgramKey FROM ProgramModule.Program ORDER BY ...</code></td><td>31 files</td></tr>
+      <tr><td><code>strStaffMemberKey</code></td><td><code>SELECT TOP 1 StaffMemberKey FROM OrganizationModule.StaffMember ORDER BY ...</code></td><td>27 files</td></tr>
+      <tr><td><code>strOrganizationKey</code></td><td><code>SELECT TOP 1 OrganizationKey FROM OrganizationModule.Organization ORDER BY ...</code></td><td>19 files</td></tr>
+      <tr><td><code>strSystemRoleKey</code></td><td><code>SELECT TOP 1 SystemRoleKey FROM SecurityModule.SystemRole ORDER BY ...</code></td><td>14 files</td></tr>
+      <tr><td><code>strPersonContactKey</code></td><td><code>SELECT TOP 1 PersonContactKey FROM PersonModule.PersonContact ORDER BY ...</code></td><td>13 files</td></tr>
+      <tr><td><code>strFileKey</code></td><td><code>SELECT TOP 1 FileKey FROM FileModule.File ORDER BY ...</code></td><td>13 files</td></tr>
+      <tr><td><code>strServiceDefinitionKey</code></td><td><code>SELECT TOP 1 ServiceDefinitionKey FROM ServiceDefinitionModule.ServiceDefinition ...</code></td><td>11 files</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-tier">Tier 2</span> Static / Generated Values</h3>
+  <table>
+    <thead><tr><th>Variable Pattern</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr><td><code>strInvalidKey</code></td><td><code>00000000-0000-0000-0000-000000000000</code></td></tr>
+      <tr><td><code>strEndPoint</code></td><td><code>BASE_URL</code> from env_config</td></tr>
+      <tr><td><code>strResource</code></td><td>Auto-derived from entity name</td></tr>
+      <tr><td><code>strEmail</code>, <code>strEmail1</code></td><td><code>auto_{timestamp}@test.com</code></td></tr>
+      <tr><td><code>strName</code>, <code>strFullName</code>, <code>strShortName</code></td><td><code>AutoTest_{random}</code></td></tr>
+      <tr><td><code>strFirstName</code>, <code>strLastName</code></td><td><code>TestFirst_{random}</code>, <code>TestLast_{random}</code></td></tr>
+      <tr><td><code>strStartDate</code>, <code>strEndDate</code></td><td>Today, Today+365</td></tr>
+      <tr><td><code>strPhoneNumber</code></td><td><code>5551234567</code></td></tr>
+      <tr><td><code>strDescription</code>, <code>strNote</code></td><td><code>Automation test {timestamp}</code></td></tr>
+      <tr><td><code>strIdentifier</code></td><td><code>AUTO_{random}</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-tier">Tier 3</span> Created-During-Run Keys</h3>
+  <p>Keys created by the happy path POST in the same Excel and used by subsequent sheets:</p>
+  <table>
+    <thead><tr><th>Variable</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td><code>strAppointmentKey</code></td><td>Extracted from 001_TC001 POST response</td></tr>
+      <tr><td><code>strGuardianshipKey</code></td><td>Extracted from 001_TC001 POST response</td></tr>
+      <tr><td><code>strLocationTypeKey</code></td><td>Extracted from sub-endpoint POST response</td></tr>
+      <tr><td>etc.</td><td>The entity's own key from its own POST</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3><span class="badge badge-tier">Tier 4</span> Domain Model Auto-Discovery</h3>
+  <p>When a variable is not in Tier 1–3, the framework:</p>
+  <ol>
+    <li>Reads <code>API Domain and Model/.../{ Module }/{ Entity }_POST.json</code></li>
+    <li>Finds the field shape (string, GUID, vocab code object, date, boolean)</li>
+    <li>Generates an appropriate value</li>
+  </ol>
+</div>
+
+<!-- ROUTE DISCOVERY -->
+<h2>Route Discovery Strategy (route-discoverer.ts)</h2>
+<div class="card">
+  <p><strong>Zero hardcoding.</strong> Routes are derived from 4 sources in priority order:</p>
+  <table>
+    <thead><tr><th>Priority</th><th>Source</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-src">1</span></td><td>Excel <code>RequestUrl</code> column</td><td>Newer files (727xxx+) have explicit URL per row — use as-is after variable substitution</td></tr>
+      <tr><td><span class="badge badge-src">2</span></td><td><code>api_to_table_mapping.json</code></td><td>Already exists in <code>SnowflakeSilverTable comp/</code> — maps entity → route → SQL tables</td></tr>
+      <tr><td><span class="badge badge-src">3</span></td><td>Convention-based derivation</td><td><code>Appointment</code> → <code>/api/v1/appointment-module/appointment</code> (kebab-case)</td></tr>
+      <tr><td><span class="badge badge-src">4</span></td><td>Domain Model folder structure</td><td><code>AppointmentModule/Appointment_POST.json</code> → Module + Entity</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- RESPONSE VALIDATION -->
+<h2>Response Validation (response-validator.ts)</h2>
+<div class="card">
+  <h3>Status Code Validation</h3>
+<pre><code><span class="cm">// Excel has StatusCode column</span>
+<span class="fn">expect</span>(response.status).<span class="fn">toBe</span>(expectedStatus);</code></pre>
+
+  <h3>UserMessage Validation (EXACT match)</h3>
+  <p>The Excel <code>UserMessage</code> column contains exact error messages, semicolon-separated:</p>
+<pre><code><span class="str">"The Subject field is required."</span>
+<span class="str">"The BusinessProfile field is required.;The OrganizationKey field is required."</span></code></pre>
+<pre><code><span class="kw">function</span> <span class="fn">validateUserMessage</span>(responseBody: <span class="kw">any</span>, expectedMessages: <span class="kw">string</span>): <span class="kw">void</span> {
+  <span class="kw">const</span> actualMessages = <span class="fn">extractMessages</span>(responseBody);
+  <span class="kw">const</span> expected = expectedMessages.<span class="fn">split</span>(<span class="str">';'</span>).<span class="fn">map</span>(m =&gt; m.<span class="fn">trim</span>()).<span class="fn">filter</span>(Boolean);
+  <span class="kw">for</span> (<span class="kw">const</span> msg <span class="kw">of</span> expected) {
+    <span class="fn">expect</span>(actualMessages).<span class="fn">toContain</span>(msg);
+  }
+}
+
+<span class="kw">function</span> <span class="fn">extractMessages</span>(body: <span class="kw">any</span>): <span class="kw">string</span>[] {
+  <span class="cm">// Pattern 1: body.responseMessages[].userMessage</span>
+  <span class="kw">if</span> (body?.responseMessages)
+    <span class="kw">return</span> body.responseMessages.<span class="fn">map</span>((rm: <span class="kw">any</span>) =&gt; rm.userMessage || rm.message || <span class="str">''</span>);
+  <span class="cm">// Pattern 2: body.message</span>
+  <span class="kw">if</span> (body?.message) <span class="kw">return</span> [body.message];
+  <span class="cm">// Pattern 3: body.errors (validation)</span>
+  <span class="kw">if</span> (body?.errors) <span class="kw">return</span> Object.<span class="fn">values</span>(body.errors).<span class="fn">flat</span>().<span class="fn">map</span>(String);
+  <span class="kw">return</span> [JSON.<span class="fn">stringify</span>(body)];
+}</code></pre>
+
+  <h3>RecordCount Validation</h3>
+  <p>The Excel <code>RecordCount</code> column has expressions:</p>
+  <table>
+    <thead><tr><th>Excel Value</th><th>Assertion</th></tr></thead>
+    <tbody>
+      <tr><td><code>"Greater Than or Equals to 1"</code></td><td><code>expect(count).toBeGreaterThanOrEqual(1)</code></td></tr>
+      <tr><td><code>"1"</code></td><td><code>expect(count).toBe(1)</code></td></tr>
+      <tr><td><code>"0"</code></td><td><code>expect(count).toBe(0)</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SELF-HEALING -->
+<h2>Self-Healing: Domain Model Auto-Discovery</h2>
+<div class="card">
+  <p>When the domain changes (new fields added), the framework auto-adapts by reading from:</p>
+<pre><code>API Domain and Model/
+  AllModules_ApiModels_20260414/
+    AppointmentModule/
+      Appointment_POST.json    ← POST payload shape
+      Appointment_GET.json     ← GET response shape</code></pre>
+  <p>The loader:</p>
+  <ol>
+    <li>Reads <code>{Entity}_POST.json</code> to know the full field shape</li>
+    <li>When Excel payload has <code>${strXxxKey}</code> for a GUID field → resolve as GUID</li>
+    <li>When field is a vocab code object → resolve with proper <code>{code, name, codeSystemIdentifier}</code> shape</li>
+    <li>When a <strong>new field</strong> is added to the domain but not in Excel → framework still works (only sends what Excel specifies)</li>
+    <li>When validating GET responses → uses GET model to know which fields to expect</li>
+  </ol>
+</div>
+
+<footer>API E2E Testing Framework Architecture — Phase 2 of 3</footer>
+</div>
+</body>
+</html>
