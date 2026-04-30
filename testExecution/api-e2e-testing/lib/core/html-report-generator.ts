@@ -52,10 +52,6 @@ function buildTree(results: ScenarioResult[]): FileSummary[] {
   const fileMap = new Map<string, Map<string, ScenarioResult[]>>();
 
   for (const r of results) {
-    // Derive file from sheet name: "609768_001_TC001" → file context from the describe block
-    // The spec sets sheet = sheet.sheetName which is the Excel sheet name.
-    // We group by the file-level describe (stored in the result if available).
-    // Fallback: group by TFS prefix from sheet name.
     const fileParts = r.sheet.match(/^(\d+)_/);
     const fileKey = (r as any).file || (fileParts ? fileParts[1] : 'Unknown');
 
@@ -87,6 +83,15 @@ function buildTree(results: ScenarioResult[]): FileSummary[] {
 
   files.sort((a, b) => b.failed - a.failed || a.file.localeCompare(b.file));
   return files;
+}
+
+function typeIcon(type: string): string {
+  const icons: Record<string, string> = {
+    CreateHappy: '🟢', CreateNegative: '🔴', UpdateHappy: '🟡', UpdateNegative: '🟠',
+    SubEndpointHappy: '🔵', SubEndpointNegative: '🟣', SearchValidation: '🔍',
+    ErrorCodeValidation: '⚠️', ComboTest: '🔗', AddRemoveTest: '➕',
+  };
+  return icons[type] || '📋';
 }
 
 export function generateHtmlReport(

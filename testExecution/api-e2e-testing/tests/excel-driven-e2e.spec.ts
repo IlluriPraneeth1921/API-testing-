@@ -168,6 +168,7 @@ for (const pf of parsedFiles) {
 
     // ── SETUP: Runs once before all tests in this Excel file ──
     test.beforeAll(async ({ playwright }) => {
+      test.setTimeout(120_000); // 2 min for auth + swagger + key resolution
       console.log(`\n📋 ${pf.file}: ${pf.suite.sheets.length} sheets, entity=${pf.entityName}`);
 
       // Step A: Create API client (handles Cognito token + Bearer header)
@@ -195,7 +196,13 @@ for (const pf of parsedFiles) {
       });
       await resolver.init(SKIP_SQL);
 
-      // Step F: Pre-seed org/loc/staff keys from env_config.json
+      // Step F: Run aggregate-specific SQL to fetch all reference keys for this entity
+      await resolver.resolveAggregateKeys(pf.entityName);
+
+      // Step F2: Fetch reference keys via API for any keys not yet resolved
+      await resolveKeysViaApi(api, resolver, CFG);
+
+      // Step G: Pre-seed org/loc/staff keys from env_config.json (overrides SQL)
       if (CFG.CONTEXT_ORG_KEY) resolver.setKey('strOrganizationKey', CFG.CONTEXT_ORG_KEY);
       if (CFG.CONTEXT_LOC_KEY) resolver.setKey('strLocationKey', CFG.CONTEXT_LOC_KEY);
       if (CFG.CONTEXT_STAFF_KEY) resolver.setKey('strStaffMemberKey', CFG.CONTEXT_STAFF_KEY);
@@ -209,6 +216,11 @@ for (const pf of parsedFiles) {
         ])
       );
       await resolver.resolveNeededKeys(extractVariables(allText));
+
+      // Step H: Dynamic Swagger-based key resolution for any remaining unresolved keys
+      if ((pf as any)._swagger) {
+        await resolveMissingKeysViaSwagger(api, resolver, extractVariables(allText), (pf as any)._swagger);
+      }
     });
 
     // ── TEARDOWN: Write reports + cleanup after all tests ──
@@ -225,6 +237,9 @@ for (const pf of parsedFiles) {
     });
 
     let entityKeyInjected = false;
+    let lastPostBody: any = null;
+    let lastPostKey: string | null = null;
+    let searchFieldsSnapshotted = false;
 
     // Serial so CreateHappy runs first → entityKey shared to Update/Negative/Search
     test.describe.configure({ mode: 'serial' });
@@ -276,7 +291,7 @@ for (const pf of parsedFiles) {
 
             try {
               await runScenario(api, resolver, pf.route, pf.entityName, sheet, scenario, result, (pf as any)._swagger);
-              result.passed = true;
+              if (result.passed !== false) result.passed = true;
             } catch (e: any) {
               result.passed = false;
               result.error = e.message?.slice(0, 500);
@@ -288,20 +303,254 @@ for (const pf of parsedFiles) {
               if (sheet.sheetType === 'CreateHappy' && result.entityKey && !entityKey) {
                 entityKey = result.entityKey;
                 resolver.setKey(`str${pf.entityName}Key`, entityKey);
+                lastPostBody = (result as any)._postBody || null;
                 console.log(`   🔑 ${pf.entityName}Key = ${entityKey}`);
+                // P4: Snapshot the randomized fields used for this successful POST
+                // so search scenarios use matching values instead of later-randomized ones
+                if (!searchFieldsSnapshotted) {
+                  searchFieldsSnapshotted = true;
+                  resolver.snapshotSearchFields();
+                }
+              }
+              // Always keep the most complete POST body for comparison
+              if (sheet.sheetType === 'CreateHappy' && (result as any)._postBody) {
+                const newBody = (result as any)._postBody;
+                const newSize = JSON.stringify(newBody).length;
+                const oldSize = lastPostBody ? JSON.stringify(lastPostBody).length : 0;
+                if (newSize > oldSize) {
+                  lastPostBody = newBody;
+                  lastPostKey = result.entityKey || lastPostKey;
+                }
               }
             }
           });
         }
       });
     }
+
+    // ── POST vs GET Comparison (runs at the end after all sheets) ──
+    test(`[POST vs GET] Verify ${pf.entityName}`, async () => {
+      // Use the key that matches the most complete POST body
+      const compareKey = lastPostKey || entityKey;
+      if (!compareKey) { console.log('   ⚠ No entity key — skipping POST vs GET'); return; }
+      if (!lastPostBody) { console.log('   ⚠ No successful POST body — skipping POST vs GET'); return; }
+
+      // Save the full POST body for reference
+      report.saveJson('post_vs_get_post_body.json', lastPostBody);
+
+      const getUrl = pf.route.getRoute.replace(/{[^}]+}/, compareKey);
+      console.log(`   📥 GET ${getUrl}`);
+      console.log(`   📝 POST body fields: ${Object.keys(flattenObj(lastPostBody)).length}`);
+      const getResp = await api.send('GET', getUrl);
+      if (getResp.status !== 200) { console.log(`   ⚠ GET returned ${getResp.status}`); return; }
+
+      report.saveJson('post_vs_get_response.json', getResp.data);
+      const getModel = getResp.data?.model ?? getResp.data;
+
+      const comparison = comparePostVsGet(lastPostBody, getModel, pf.entityName);
+      report.saveJson('post_vs_get_comparison.json', comparison);
+
+      // Write CSV
+      const csvLines = ['Field,POST_Value,GET_Value,Match'];
+      let matched = 0, mismatched = 0, postOnly = 0, getOnly = 0;
+      for (const row of comparison) {
+        csvLines.push(`${csvEsc(row.field)},${csvEsc(row.postValue)},${csvEsc(row.getValue)},${row.match}`);
+        if (row.match === 'YES') matched++;
+        else if (row.match === 'NO') mismatched++;
+        else if (row.match === 'POST_ONLY') postOnly++;
+        else getOnly++;
+      }
+      fs.writeFileSync(path.join(outDir, '08_post_vs_get.csv'), csvLines.join('\n'), 'utf-8');
+
+      console.log(`   📊 POST vs GET Comparison:`);
+      console.log(`      ✅ Matched:   ${matched}`);
+      console.log(`      ❌ Mismatch:  ${mismatched}`);
+      console.log(`      📤 POST only: ${postOnly}`);
+      console.log(`      📥 GET only:  ${getOnly}`);
+      console.log(`      📝 Total:     ${comparison.length}`);
+
+      if (mismatched > 0) {
+        console.log(`\n   ❌ Mismatched fields:`);
+        for (const m of comparison.filter(r => r.match === 'NO')) {
+          console.log(`      ${m.field}:`);
+          console.log(`        POST: ${String(m.postValue).slice(0, 100)}`);
+          console.log(`        GET:  ${String(m.getValue).slice(0, 100)}`);
+        }
+      }
+      if (postOnly > 0) {
+        console.log(`\n   📤 Fields in POST but missing in GET:`);
+        for (const m of comparison.filter(r => r.match === 'POST_ONLY')) {
+          console.log(`      ${m.field}: ${String(m.postValue).slice(0, 80)}`);
+        }
+      }
+    });
   });
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// BLOCK 6: SUB-ENDPOINT KEY CAPTURE
+// BLOCK 6: API-BASED KEY RESOLVER (when SQL is skipped)
+//   Fetches ProgramKey, SystemRoleKey, PersonKey etc. via GET APIs
+// ══════════════════════════════════════════════════════════════════════
+
+async function resolveKeysViaApi(api: ApiClient, resolver: VariableResolver, cfg: typeof CFG): Promise<void> {
+  // Generic key-to-endpoint mapping: covers all common entity keys
+  const endpoints: { varName: string; url: string; keyField: string }[] = [
+    { varName: 'strProgramKey', url: '/api/v1/program-module/program?pageSize=2', keyField: 'programKey' },
+    { varName: 'strSystemRoleKey', url: '/api/v1/security-module/system-roles?paginationToken=0&pageSize=2', keyField: 'systemRoleKey' },
+    { varName: 'strPersonKey', url: '/api/v1/person-module/person?pageSize=2', keyField: 'personKey' },
+    { varName: 'strCaseKey', url: '/api/v1/case-module/cases?paginationToken=0&pageSize=2', keyField: 'caseKey' },
+    { varName: 'strOrganizationKey', url: '/api/v1/organization-module/organizations?paginationToken=0&pageSize=2', keyField: 'organizationKey' },
+    { varName: 'strStaffMemberKey', url: '/api/v1/organization-module/staff-members?paginationToken=0&pageSize=2', keyField: 'staffMemberKey' },
+    { varName: 'strLocationKey', url: '/api/v1/organization-module/locations?paginationToken=0&pageSize=2', keyField: 'locationKey' },
+    { varName: 'strServiceDefinitionKey', url: '/api/v1/service-definition-module/service-definition?pageSize=2', keyField: 'serviceDefinitionKey' },
+    { varName: 'strSystemAccountKey', url: '/api/v1/security-module/system-accounts?paginationToken=0&pageSize=2', keyField: 'systemAccountKey' },
+    { varName: 'strUserAccountKey', url: '/api/v1/security-module/user-accounts?paginationToken=0&pageSize=2', keyField: 'userAccountKey' },
+    { varName: 'strSystemPermissionKey', url: '/api/v1/security-module/system-permissions?paginationToken=0&pageSize=2', keyField: 'systemPermissionKey' },
+    { varName: 'strIncidentReportKey', url: '/api/v1/incident-module/incident-reports?paginationToken=0&pageSize=2', keyField: 'incidentReportKey' },
+    { varName: 'strGuardianshipKey', url: '/api/v1/guardianship-module/guardianship?pageSize=2', keyField: 'guardianshipKey' },
+    { varName: 'strIntakeReferralKey', url: '/api/v1/intake-referral-module/intake-referral?pageSize=2', keyField: 'intakeReferralKey' },
+    { varName: 'strServiceAuthorizationKey', url: '/api/v1/service-authorization-module/service-authorization?pageSize=2', keyField: 'serviceAuthorizationKey' },
+    { varName: 'strProtectiveServicesReportKey', url: '/api/v1/protective-services-module/protective-services-report?pageSize=2', keyField: 'protectiveServicesReportKey' },
+    { varName: 'strRegionKey', url: '/api/v1/region-module/region?pageSize=2', keyField: 'regionKey' },
+    { varName: 'strFileKey', url: '/api/v1/file-module/files?paginationToken=0&pageSize=2', keyField: 'fileKey' },
+  ];
+
+  for (const ep of endpoints) {
+    const all = resolver.getAll();
+    // Skip if base + numbered variants already resolved
+    if (all[ep.varName] && all[`${ep.varName}1`] && all[`${ep.varName}2`]) continue;
+    try {
+      const resp = await api.send('GET', ep.url);
+      if (resp.status === 200 && resp.data) {
+        const rawItems = resp.data?.model?.items || resp.data?.items;
+        const items = (Array.isArray(rawItems) && rawItems.length > 0) ? rawItems
+          : (Array.isArray(resp.data?.model) && resp.data.model.length > 0) ? resp.data.model
+          : (Array.isArray(resp.data) && resp.data.length > 0) ? resp.data
+          : [];
+        if (Array.isArray(items) && items.length > 0) {
+          // Find the key field — try exact match, then any field ending in 'Key'
+          const findKey = (item: any): string | null => {
+            if (!item) return null;
+            if (item[ep.keyField]) return String(item[ep.keyField]);
+            for (const [k, v] of Object.entries(item)) {
+              if (k.toLowerCase().endsWith('key') && typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)) return v;
+            }
+            return item.key ? String(item.key) : null;
+          };
+          const key1 = findKey(items[0]);
+          if (key1) {
+            if (!all[ep.varName]) resolver.setKey(ep.varName, key1);
+            if (!all[`${ep.varName}1`]) resolver.setKey(`${ep.varName}1`, key1);
+            console.log(`  ✓ ${ep.varName} = ${key1.slice(0, 12)}... (via API)`);
+          }
+          if (items.length > 1) {
+            const key2 = findKey(items[1]);
+            if (key2 && !all[`${ep.varName}2`]) {
+              resolver.setKey(`${ep.varName}2`, key2);
+              console.log(`  ✓ ${ep.varName}2 = ${key2.slice(0, 12)}... (via API)`);
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.log(`  ⚠ API lookup failed for ${ep.varName}: ${e.message}`);
+    }
+  }
+
+  // Backfill: if strXxxKey1 exists but strXxxKey doesn't, copy it
+  const finalAll = resolver.getAll();
+  for (const [k, v] of Object.entries(finalAll)) {
+    const m = k.match(/^(str\w+Key)1$/);
+    if (m && !finalAll[m[1]]) {
+      resolver.setKey(m[1], v);
+      console.log(`  ✓ ${m[1]} = ${v.slice(0, 12)}... (backfill from ${k})`);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// BLOCK 6c: DYNAMIC SWAGGER-BASED KEY RESOLUTION
+//   For any str{Entity}Key still unresolved, try to find a matching
+//   Swagger list endpoint and fetch a real key from the environment.
+// ══════════════════════════════════════════════════════════════════════
+
+function toKebab(s: string): string {
+  return s.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+async function resolveMissingKeysViaSwagger(
+  api: ApiClient, resolver: VariableResolver,
+  neededVars: Set<string>, swagger: Record<string, any>,
+): Promise<void> {
+  const all = resolver.getAll();
+  const paths = Object.keys(swagger.paths || {});
+
+  for (const varName of neededVars) {
+    // Only handle strXxxKey / strXxxKey1 / strXxxKey2 patterns
+    const m = varName.match(/^str(\w+?)Key(\d?)$/);
+    if (!m) continue;
+    if (all[varName]) continue;
+
+    const entityName = m[1]; // e.g. "Program", "ServiceDefinition"
+    const kebab = toKebab(entityName); // e.g. "program", "service-definition"
+    const keyField = entityName.charAt(0).toLowerCase() + entityName.slice(1) + 'Key';
+
+    // Find a list endpoint: GET /api/v1/{module}/{kebab-plural}
+    const listPath = paths.find(p => {
+      const methods = swagger.paths[p];
+      if (!methods?.get) return false;
+      const segs = p.split('/').filter(Boolean);
+      const last = segs[segs.length - 1];
+      // Match plural: "programs", "service-definitions", etc.
+      return (last === kebab + 's' || last === kebab + 'es') && !p.includes('{');
+    });
+    if (!listPath) continue;
+
+    try {
+      const url = `${listPath}?paginationToken=0&pageSize=2`;
+      const resp = await api.send('GET', url);
+      if (resp.status !== 200) continue;
+      const rawItems = resp.data?.model?.items || resp.data?.items;
+      const items = (Array.isArray(rawItems) && rawItems.length > 0) ? rawItems
+        : (Array.isArray(resp.data?.model) && resp.data.model.length > 0) ? resp.data.model
+        : (Array.isArray(resp.data) && resp.data.length > 0) ? resp.data
+        : [];
+      if (!Array.isArray(items) || items.length === 0) continue;
+
+      const findKey = (item: any): string | null => {
+        if (!item) return null;
+        if (item[keyField]) return String(item[keyField]);
+        for (const [k, v] of Object.entries(item)) {
+          if (k.toLowerCase().endsWith('key') && typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)) return v;
+        }
+        return null;
+      };
+
+      const baseVar = `str${entityName}Key`;
+      const key1 = findKey(items[0]);
+      if (key1) {
+        if (!all[baseVar]) { resolver.setKey(baseVar, key1); all[baseVar] = key1; }
+        if (!all[`${baseVar}1`]) { resolver.setKey(`${baseVar}1`, key1); all[`${baseVar}1`] = key1; }
+        console.log(`  ✓ ${baseVar} = ${key1.slice(0, 12)}... (via Swagger: ${listPath})`);
+      }
+      if (items.length > 1) {
+        const key2 = findKey(items[1]);
+        if (key2 && !all[`${baseVar}2`]) {
+          resolver.setKey(`${baseVar}2`, key2); all[`${baseVar}2`] = key2;
+          console.log(`  ✓ ${baseVar}2 = ${key2.slice(0, 12)}... (via Swagger)`);
+        }
+      }
+    } catch (e: any) {
+      // Silently skip — not all entities have list endpoints
+    }
+  }
+}
 //   After a sub-endpoint call (e.g. PUT /location/{key}/location-type),
 //   extract the returned key and store it for later use in other scenarios
+// ══════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════
+// BLOCK 6b: SUB-ENDPOINT KEY CAPTURE
 // ══════════════════════════════════════════════════════════════════════
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -390,7 +639,15 @@ async function runHappyPath(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
   sc: TestScenario, sheet: TestSheet, result: Partial<ScenarioResult>, entityName: string,
 ) {
+  // Inject fresh random names/emails so every scenario creates unique data
+  if (sheet.sheetType === 'CreateHappy') {
+    resolver.randomizeFields();
+  }
+
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
+  if (sheet.sheetType === 'CreateHappy') {
+    resolver.fillRequiredAddressFields(body);
+  }
   const isUpdate = sheet.sheetType === 'UpdateHappy';
   const method = isUpdate ? route.updateMethod : 'POST';
   let url: string;
@@ -411,14 +668,18 @@ async function runHappyPath(
   const resp = await api.send(method, url, body);
   result.actualStatus = resp.status;
 
-  // Log failure but don't assert — serial mode must continue
+  // Track status mismatch — don't assert so serial mode continues
   if (resp.status !== result.expectedStatus) {
-    console.log(`  ⚠ ${sc.scenario}: expected ${result.expectedStatus}, got ${resp.status}`);
+    console.log(`  ⚠ ${sc.scenario}: expected ${result.expectedStatus}, got ${resp.status}: ${JSON.stringify(resp.data).slice(0, 400)}`);
+    result.passed = false;
   }
 
   if (!isUpdate && resp.status >= 200 && resp.status < 300 && resp.data) {
     const key = extractEntityKey(resp.data, entityName);
-    if (key) result.entityKey = key;
+    if (key) {
+      result.entityKey = key;
+      (result as any)._postBody = body;
+    }
   }
 }
 
@@ -464,6 +725,9 @@ async function runSubEndpointHappy(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
   sc: TestScenario, result: Partial<ScenarioResult>, swagger?: Record<string, any> | null,
 ) {
+  // Inject fresh random names/emails so every scenario creates unique data
+  resolver.randomizeFields();
+
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
   const url = resolver.resolveUrl(sc.requestUrl || '', route.resource);
   const method = swagger ? getWriteMethod(swagger, url) : 'PUT';
@@ -478,6 +742,8 @@ async function runSubEndpointHappy(
   // Capture sub-endpoint key from response (e.g. locationTypeKey → strLocationTypeKey)
   if (resp.status >= 200 && resp.status < 300 && resp.data) {
     captureSubEndpointKeys(resp.data, url, resolver);
+    // Snapshot randomized fields so search scenarios match the created sub-endpoint data
+    resolver.snapshotSearchFields();
   }
 
   assertStatus(resp.status, result.expectedStatus, sc.scenario);
@@ -515,6 +781,8 @@ async function runSearch(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
   sc: TestScenario, result: Partial<ScenarioResult>,
 ) {
+  // P4: Restore snapshotted field values so search filters match the created data
+  resolver.restoreSearchFields();
   const url = resolver.resolveUrl(sc.requestUrl || '', route.resource);
 
   result.method = 'GET';
@@ -528,9 +796,25 @@ async function runSearch(
   assertStatus(resp.status, 200, sc.scenario);
 
   if (sc.recordCount) {
-    const countResult = validateRecordCount(resp.data, sc.recordCount);
+    let countResult = validateRecordCount(resp.data, sc.recordCount);
+    let finalData = resp.data;
+    // Retry twice with delays if count check fails (search indexing delay)
+    if (!countResult.passed && parseInt(sc.recordCount) > 0) {
+      for (const delay of [3000, 5000]) {
+        await new Promise(r => setTimeout(r, delay));
+        const retry = await api.send('GET', url);
+        if (retry.status === 200) {
+          const retryResult = validateRecordCount(retry.data, sc.recordCount);
+          if (retryResult.passed) {
+            countResult = retryResult;
+            finalData = retry.data;
+            break;
+          }
+        }
+      }
+    }
     result.countMatch = countResult.passed;
-    assertRecordCount(resp.data, sc.recordCount, sc.scenario);
+    assertRecordCount(finalData, sc.recordCount, sc.scenario);
   }
 }
 
@@ -605,17 +889,190 @@ async function runAddRemove(
 
   const putResp = await api.send(writeMethod, putUrl, body);
   result.actualStatus = putResp.status;
+  if (putResp.status !== (sc.putStatusCode || 200)) {
+    console.log(`  ⚠ ${sc.scenario} ${writeMethod} add → ${putResp.status}: ${JSON.stringify(putResp.data).slice(0, 300)}`);
+  }
   assertStatus(putResp.status, sc.putStatusCode || 200, `${sc.scenario} ${writeMethod} add`);
+
+  // Build remove body: merge the add body with any key returned from the add response
+  // so remove endpoints that require the child key (e.g. remove-phone) get it.
+  // If the add response only returns the parent key, fetch the entity to find the child.
+  const removeBody = await buildRemoveBody(api, body, putResp.data, putUrl);
+  if (removeBody !== body) {
+    console.log(`  🔗 Remove body built from add response: ${JSON.stringify(removeBody).slice(0, 200)}`);
+  }
 
   if (sc.putRemoveRequestUrl) {
     const removeUrl = resolver.resolveUrl(sc.putRemoveRequestUrl, route.resource);
     const removeMethod = swagger ? getWriteMethod(swagger, removeUrl) : 'PUT';
-    const removeResp = await api.send(removeMethod, removeUrl, body);
+    const removeResp = await api.send(removeMethod, removeUrl, removeBody);
+    if (removeResp.status !== (sc.putRemoveStatusCode || 200)) {
+      console.log(`  ⚠ ${sc.scenario} ${removeMethod} remove → ${removeResp.status}: ${JSON.stringify(removeResp.data).slice(0, 300)}`);
+    }
     assertStatus(removeResp.status, sc.putRemoveStatusCode || 200, `${sc.scenario} ${removeMethod} remove`);
   }
   if (sc.deleteRemoveRequestUrl) {
     const deleteUrl = resolver.resolveUrl(sc.deleteRemoveRequestUrl, route.resource);
     const deleteResp = await api.send('DELETE', deleteUrl);
+    if (deleteResp.status !== (sc.deleteRemoveStatusCode || 200)) {
+      console.log(`  ⚠ ${sc.scenario} DELETE remove → ${deleteResp.status}: ${JSON.stringify(deleteResp.data).slice(0, 300)}`);
+    }
     assertStatus(deleteResp.status, sc.deleteRemoveStatusCode || 200, `${sc.scenario} DELETE remove`);
   }
+}
+
+/** Merge the original add body with any key field from the add response.
+ *  Some remove endpoints need the child key that was returned by the add call.
+ *  If the add response only returns the parent entity key, fetches the entity
+ *  to find the matching child record with its server-assigned key.
+ *  @param api - API client for fetching entity if needed
+ *  @param addBody - the original request body sent to the add endpoint
+ *  @param addResponse - the raw response from the add endpoint
+ *  @param addUrl - the PUT add URL, used to derive context */
+async function buildRemoveBody(api: ApiClient, addBody: any, addResponse: any, addUrl?: string): Promise<any> {
+  if (!addResponse) return addBody;
+  const model = addResponse.model ?? addResponse;
+
+  // If model is a full object with child key fields, merge them into addBody
+  if (model && typeof model === 'object' && !Array.isArray(model)) {
+    const merged = { ...addBody };
+    let hasKey = false;
+    for (const [k, v] of Object.entries(model)) {
+      if (k.toLowerCase().endsWith('key') && typeof v === 'string' && GUID_RE.test(v as string)) {
+        merged[k] = v;
+        hasKey = true;
+      }
+    }
+    if (hasKey) return merged;
+  }
+
+  // If model is a GUID string, it's likely the parent entity key (not the child key).
+  // Fetch the entity and find the matching child record to get its server-assigned key.
+  if (typeof model === 'string' && GUID_RE.test(model) && addUrl) {
+    const childRecord = await fetchMatchingChild(api, model, addBody, addUrl);
+    if (childRecord) return childRecord;
+  }
+
+  return addBody;
+}
+
+/** Fetch the parent entity and find the child record matching addBody.
+ *  e.g. GET /organization/{key} → find matching phone in organizationPhones[] */
+async function fetchMatchingChild(
+  api: ApiClient, parentKey: string, addBody: any, addUrl: string,
+): Promise<any | null> {
+  // Parse URL: .../organization/{key}/add-phone → entity=organization, child=phone
+  const segments = addUrl.replace(/\?.*/, '').split('/').filter(Boolean);
+  const lastSeg = segments[segments.length - 1]; // e.g. "add-phone"
+  if (!lastSeg?.startsWith('add-')) return null;
+
+  const child = lastSeg.slice(4); // "phone"
+  // Build the GET URL for the parent entity
+  const keyIdx = segments.findIndex(s => GUID_RE.test(s));
+  if (keyIdx < 0) return null;
+  const getPath = '/' + segments.slice(0, keyIdx + 1).join('/');
+
+  try {
+    const resp = await api.send('GET', getPath);
+    if (resp.status !== 200) return null;
+    const entity = resp.data?.model ?? resp.data;
+    if (!entity || typeof entity !== 'object') return null;
+
+    // Find the array field: "organization" + "Phone" + "s" → organizationPhones
+    const parentName = segments[keyIdx - 1]; // e.g. "organization"
+    const parentPascal = parentName.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const childPascal = child.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const arrayName = parentPascal.charAt(0).toLowerCase() + parentPascal.slice(1) + childPascal + 's';
+
+    const items = entity[arrayName];
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    // Find the item matching addBody by comparing shared fields
+    const match = items.find((item: any) => {
+      for (const [k, v] of Object.entries(addBody)) {
+        if (k.toLowerCase().endsWith('key')) continue;
+        if (typeof v === 'string' && item[k] !== v) return false;
+      }
+      return true;
+    });
+    // If no exact match, use the last item (most recently added)
+    return match || items[items.length - 1];
+  } catch {
+    return null;
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// BLOCK 9: POST vs GET COMPARISON
+//   Flattens POST body and GET response, compares field by field
+// ══════════════════════════════════════════════════════════════════════
+
+interface CompareRow {
+  field: string;
+  postValue: string;
+  getValue: string;
+  match: 'YES' | 'NO' | 'GET_ONLY' | 'POST_ONLY';
+}
+
+function flattenObj(obj: any, prefix = ''): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!obj || typeof obj !== 'object') return result;
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v === null || v === undefined) continue;
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => {
+        if (typeof item === 'object') Object.assign(result, flattenObj(item, `${key}[${i}]`));
+        else result[`${key}[${i}]`] = String(item);
+      });
+    } else if (typeof v === 'object') {
+      Object.assign(result, flattenObj(v, key));
+    } else {
+      result[key] = String(v);
+    }
+  }
+  return result;
+}
+
+function normalizeValue(v: string): string {
+  if (!v) return '';
+  // Normalize dates, GUIDs, whitespace
+  return v.trim().toLowerCase().replace(/t00:00:00(\.000)?z?$/i, '').replace(/\s+/g, ' ');
+}
+
+function comparePostVsGet(postBody: any, getModel: any, entityName: string): CompareRow[] {
+  const postFlat = flattenObj(postBody);
+  const getFlat = flattenObj(getModel);
+  const results: CompareRow[] = [];
+  const skipKeys = new Set(['$type', 'hasError', 'hasWarning', 'responseMessages', 'entityCreatedTimestamp', 'entityUpdatedTimestamp', 'createdBy', 'updatedBy']);
+
+  // Compare POST fields against GET
+  for (const [field, postVal] of Object.entries(postFlat)) {
+    const baseName = field.split('.').pop()?.toLowerCase() || '';
+    if (skipKeys.has(baseName)) continue;
+    const getVal = getFlat[field];
+    if (getVal !== undefined) {
+      const match = normalizeValue(postVal) === normalizeValue(getVal) ? 'YES' : 'NO';
+      results.push({ field, postValue: postVal, getValue: getVal, match });
+    } else {
+      results.push({ field, postValue: postVal, getValue: '', match: 'POST_ONLY' });
+    }
+  }
+
+  // GET-only fields
+  for (const [field, getVal] of Object.entries(getFlat)) {
+    const baseName = field.split('.').pop()?.toLowerCase() || '';
+    if (skipKeys.has(baseName)) continue;
+    if (postFlat[field] === undefined) {
+      results.push({ field, postValue: '', getValue: getVal, match: 'GET_ONLY' });
+    }
+  }
+
+  return results;
+}
+
+function csvEsc(val: any): string {
+  const s = String(val ?? '');
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }

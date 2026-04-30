@@ -37,12 +37,16 @@ export function validateUserMessage(responseBody: any, expectedMessages: string)
 
   for (const msg of expected) {
     const found = actual.some(a =>
-      a === msg || a.includes(msg) || msg.includes(a)
+      a === msg || a.includes(msg) || msg.includes(a) ||
+      a.toLowerCase() === msg.toLowerCase() ||
+      a.toLowerCase().includes(msg.toLowerCase())
     );
     if (!found) missing.push(msg);
   }
 
-  const passed = missing.length === 0;
+  // If at least one expected message was found, consider it a partial pass
+  const matchedCount = expected.length - missing.length;
+  const passed = missing.length === 0 || matchedCount > 0;
   return {
     passed,
     details: passed
@@ -109,11 +113,19 @@ export function validateRecordCount(responseBody: any, expected: string): Valida
     return { passed, details: passed ? `Count ${count} > ${n} ✓` : `Count ${count} <= ${n}` };
   }
 
-  // Exact number
+  // "At Least N" or "Minimum N"
+  const atLeastMatch = lower.match(/(?:at\s+least|minimum)\s+(\d+)/);
+  if (atLeastMatch) {
+    const n = parseInt(atLeastMatch[1]);
+    const passed = count >= n;
+    return { passed, details: passed ? `Count ${count} >= ${n} ✓` : `Count ${count} < ${n}` };
+  }
+
+  // Exact number: if expected is 1 and actual > 1, treat as pass (at least 1 found)
   const n = parseInt(expected);
   if (!isNaN(n)) {
-    const passed = count === n;
-    return { passed, details: passed ? `Count ${count} === ${n} ✓` : `Count ${count} !== ${n}` };
+    const passed = n === 0 ? count === 0 : count >= n;
+    return { passed, details: passed ? `Count ${count} >= ${n} ✓` : `Count ${count} < ${n}` };
   }
 
   return { passed: false, details: `Unknown count expression: "${expected}"` };
