@@ -104,6 +104,10 @@
     "test:devf1:offer-group": "cross-env ENV_NAME=DevF1 EXCEL=648114_OfferGroup.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
     "test:devf1:subscription": "cross-env ENV_NAME=DevF1 EXCEL=648084_Subscription.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
     "test:devf1:all": "cross-env ENV_NAME=DevF1 SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:f1:org": "cross-env ENV_NAME=F1 EXCEL=728300_Organization.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:f1:location": "cross-env ENV_NAME=F1 EXCEL=727573_Location.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:f1:staffmember": "cross-env ENV_NAME=F1 EXCEL=727911_StaffMember.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
+    "test:f1:all": "cross-env ENV_NAME=F1 SKIP_SQL=true npx playwright test excel-driven-e2e",
     "report": "npx playwright show-report playwright-report",
     "report:consolidated": "npx ts-node lib/core/consolidated-report.ts",
     "report:consolidated:filter": "npx ts-node lib/core/consolidated-report.ts"

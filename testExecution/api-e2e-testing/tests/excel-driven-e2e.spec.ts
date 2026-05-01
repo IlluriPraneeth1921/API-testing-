@@ -37,7 +37,7 @@ import {
   assertStatus, assertUserMessage, assertRecordCount,
 } from '../lib/core/response-validator';
 import { E2EReportGenerator, type ScenarioResult } from '../lib/core/e2e-report-generator';
-import { getUserContextCookie } from '../lib/cookie-manager';
+import { getUserContextCookie, clearCookieCache } from '../lib/cookie-manager';
 import * as fs from 'fs';
 
 // ══════════════════════════════════════════════════════════════════════
@@ -159,6 +159,7 @@ if (parsedFiles.length === 0) {
 for (const pf of parsedFiles) {
   test.describe(`${pf.file}`, () => {
     let api: ApiClient;
+    let apiCtx: any;
     let resolver: VariableResolver;
     let report: E2EReportGenerator;
     let entityKey: string | null = null;
@@ -173,6 +174,7 @@ for (const pf of parsedFiles) {
 
       // Step A: Create API client (handles Cognito token + Bearer header)
       const ctx = await playwright.request.newContext();
+      apiCtx = ctx;
       api = new ApiClient(ctx, CFG);
 
       // Step B: Fetch Swagger JSON → auto-resolve correct API routes
