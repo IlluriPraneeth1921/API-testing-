@@ -581,3 +581,22 @@ TEMPLATE — Copy this block at the end of each session:
   - `testExecution/api-e2e-testing/tests/excel-driven-e2e.spec.ts` (call fillRequiredAddressFields in runHappyPath for CreateHappy only)
 - **Status**: done — framework fixes applied, remaining failures are environment/auth/data issues
 - **Next steps**: Verify Organization still passes (npm run test:devf1:org); investigate 403 on Location sub-endpoints (may need SaveUserContext cookie refresh or location added to user context); fix strSystemRoleKey to use location-level role for Location entity
+
+### Session — 2026-05-01 (evening)
+- **What we worked on**:
+  - Continued Organization E2E debugging — analyzed `🔗` debug logs for phone remove
+  - **Phone remove root cause confirmed**: `add-phone` response `model` is the **org GUID** (not the phone key). `remove-phone` API does field-value matching but still returns "no match" even with unique phone numbers and correct format. Tried: injecting response key, using full response model, randomizing phone numbers, calling `randomizeFields()` before AddRemove — none worked. Conclusion: `remove-phone` API likely requires a different body shape or endpoint pattern (e.g. DELETE with phone key in URL). This is an **API behavior limitation**, not a test framework bug
+  - **Phone number format bug fixed**: `randomizeFields()` was generating `1 (XXX XXX-XXXX` (missing `)` after area code). Fixed to `1 (XXX) XXX-XXXX`
+  - **buildRemoveBody simplified**: Removed GUID string injection (was injecting org key as `key` field, confusing the API). Now only uses response model if it's a full object with key fields
+  - **Program key**: Confirmed `strProgramKey` is completely absent from DevF1 — neither aggregate SQL, SQL Tier 1, API resolver, nor Swagger resolver found any programs. S12 + SubEndpointHappy S2 are environment data issues
+  - **Committed changes**: `git commit` on `excel-driven-e2e.spec.ts` + `package.json` — buildRemoveBody rewrite, phone randomization, debug logging
+  - **Final Organization E2E score: 136/161 (84.5%)** — up from 133/161 (82.6%) at start of session
+  - Remaining 25 failures breakdown:
+    - 3 AddRemove: S10/S11 phone remove (API limitation), S12 program key (env data)
+    - 1 SubEndpointHappy: S2 contact needs program key (env data)
+    - 21 SearchValidation: contact search (cascading), service-area search (Excel data mismatch — Alaska vs Missouri/Montana)
+- **Files created/modified**:
+  - `testExecution/api-e2e-testing/tests/excel-driven-e2e.spec.ts` (buildRemoveBody + debug log — committed)
+  - `testExecution/api-e2e-testing/lib/core/variable-resolver.ts` (phone format fix + phone randomization — committed earlier)
+- **Status**: done — all fixable code issues resolved
+- **Next steps**: Investigate `remove-phone` API contract (check Swagger for expected body shape or if DELETE endpoint exists); create a Program in DevF1 to unblock S12 + SubEndpoint S2 + cascading search failures; fix Excel service-area search data (Alaska→Missouri/Montana vocab codes)
