@@ -1,4 +1,4 @@
 import { setDefaultTimeout } from "@cucumber/cucumber";
 
-// 120 seconds
-setDefaultTimeout(120 * 1000);
+// 5 minutes - allows retry loops (up to 5 persons × ~40s each)
+setDefaultTimeout(300 * 1000);

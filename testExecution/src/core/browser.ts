@@ -5,7 +5,8 @@ export async function launchBrowser(): Promise<Browser> {
 
   const launchOptions = {
     headless: env.headless,   // ← controls UI mode
-    slowMo: env.headless ? 0 : 200   // slow actions when visible
+    slowMo: env.headless ? 0 : 200,   // slow actions when visible
+    args: ['--start-maximized', '--no-sandbox', '--force-device-scale-factor=0.75'],
   };
 
   if (env.browser === "firefox") {

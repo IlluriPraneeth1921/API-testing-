@@ -1,28 +1,37 @@
 import type { Page } from "playwright";
-import { env } from "@src/config/env";
+import { env, Waits } from "@src/config/env";
 import { getRunTimestamp } from "@src/utils/timestamp";
+import { LoginLocators, HeaderLocators } from "@src/locators";
+import { DropdownHelper } from "@src/utils/dropdown-helper";
 
 export class LoginPage {
   private screenshotDir: string;
+  private dropdown: DropdownHelper;
 
   constructor(private page: Page) {
     const timestamp = getRunTimestamp();
     this.screenshotDir = `reports/${timestamp}/screenshots`;
+    this.dropdown = new DropdownHelper(page);
   }
 
   async open() {
     console.log(`[LOGIN] Opening URL: ${env.baseUrl}`);
     await this.page.goto(env.baseUrl, { waitUntil: "domcontentloaded" });
     await this.page.setViewportSize({ width: 1920, height: 1080 });
-    await this.page.waitForTimeout(2000);
+    await this.page.waitForTimeout(Waits.AVG);
+    // Zoom out to ensure content fits in viewport
+    await this.zoomOut(2);
+    await this.page.waitForTimeout(Waits.MIN);
     await this.page.screenshot({ path: `${this.screenshotDir}/01-login-page.png` });
     console.log('[LOGIN] Login page loaded');
   }
 
   async enterCredentials(username: string, password: string) {
     console.log(`[LOGIN] Entering credentials for user: ${username}`);
-    const usernameField = this.page.locator("input#signInFormUsername").nth(1);
-    const passwordField = this.page.locator("input#signInFormPassword").nth(1);
+    // Using nth(1) because Cognito renders duplicate login forms
+    // TODO: Request data-testid from dev team to avoid positional selector
+    const usernameField = this.page.locator(LoginLocators.usernameField).nth(1);
+    const passwordField = this.page.locator(LoginLocators.passwordField).nth(1);
     await usernameField.waitFor({ state: 'visible' });
     await usernameField.fill(username);
     await passwordField.fill(password);
@@ -32,8 +41,10 @@ export class LoginPage {
 
   async clickSignIn() {
     console.log('[LOGIN] Clicking Sign In button');
-    await this.page.locator("input[aria-label='submit']").nth(1).click();
-    await this.page.waitForTimeout(5000);
+    // Using nth(1) because Cognito renders duplicate forms
+    // TODO: Request data-testid from dev team
+    await this.page.locator(LoginLocators.submitButton).nth(1).click();
+    await this.page.waitForTimeout(Waits.MAX);
     await this.page.screenshot({ path: `${this.screenshotDir}/03-after-signin.png` });
     console.log('[LOGIN] Sign In clicked');
   }
@@ -45,73 +56,82 @@ export class LoginPage {
     });
   }
 
-  async handleAcknowledgeButton(maxRetries = 3) {
+  async handleAcknowledgeButton(maxRetries = 5) {
     console.log('[LOGIN] Handling Acknowledge button');
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(Waits.AVG);
       
-      const ackBtn = this.page.locator("button, input[type='button'], input[type='submit']").filter({ hasText: /acknowledge/i });
+      const ackBtn = this.page.locator(LoginLocators.acknowledgeButton)
+        .filter({ hasText: LoginLocators.acknowledgeButtonText });
       
       if (await ackBtn.count() > 0) {
         console.log(`[LOGIN] Acknowledge button found, clicking (attempt ${attempt + 1})`);
         await ackBtn.first().click();
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForTimeout(Waits.LONG);
         await this.page.screenshot({ path: `${this.screenshotDir}/04-after-acknowledge.png` });
       }
 
-      if (await this.page.locator("span:text-is('Organization')").isVisible().catch(() => false)) {
+      if (await this.page.locator(LoginLocators.organizationLabel).isVisible().catch(() => false)) {
         console.log('[LOGIN] Organization page visible');
         return;
       }
     }
-    await this.page.waitForTimeout(2000);
+    // Final longer wait before giving up
+    await this.page.waitForTimeout(Waits.MAX);
+    console.log('[LOGIN] Acknowledge handling complete, proceeding...');
   }
 
-  async selectDropdownValue(value: string, position: number) {
+  async selectDropdownValue(value: string, position: number, fieldName: string) {
     console.log(`[LOGIN] Selecting "${value}" at position ${position}`);
-    const combobox = this.page.locator(`input[role='combobox']`).nth(position - 1);
-    await combobox.click({ force: true });
-    await this.page.waitForTimeout(500);
-    await combobox.type(value, { delay: 100 });
-    await this.page.waitForTimeout(2000);
-    await this.page.keyboard.press('ArrowDown');
-    await this.page.waitForTimeout(500);
-    await this.page.keyboard.press('Enter');
-    await this.page.waitForTimeout(1500);
-    console.log(`[LOGIN] Selected "${value}"`);
+    // Using positional selector because multiple comboboxes exist on org selection page
+    // Position 1 = Organization, Position 2 = Location, Position 3 = Staff
+    const combobox = this.page.locator(LoginLocators.combobox).nth(position - 1);
+    
+    // Use selectWithFallback: try exact value, fall back to first option
+    const selectedValue = await this.dropdown.selectWithFallback(
+      combobox,
+      value,
+      fieldName,
+      { typeDelay: 150, waitForPopulate: 3000, waitAfterEnter: 2000 }
+    );
+    console.log(`[LOGIN] ${fieldName} resolved to: "${selectedValue}"`);
+    return selectedValue;
   }
 
   async selectOrganization(org: string) {
-    await this.page.locator("span:text-is('Organization')").waitFor({ state: 'visible', timeout: 30000 });
-    await this.page.waitForTimeout(1000);
-    await this.selectDropdownValue(org, 1);
+    await this.page.locator(LoginLocators.organizationLabel).waitFor({ state: 'visible', timeout: 60000 });
+    await this.page.waitForTimeout(Waits.AVG);
+    await this.selectDropdownValue(org, 1, 'Organization');
     await this.page.screenshot({ path: `${this.screenshotDir}/05-organization-selected.png` });
   }
 
   async selectLocation(location: string) {
-    await this.selectDropdownValue(location, 2);
+    await this.page.waitForTimeout(Waits.AVG);
+    await this.selectDropdownValue(location, 2, 'Location');
     await this.page.screenshot({ path: `${this.screenshotDir}/06-location-selected.png` });
   }
 
   async selectStaffMember(staff: string) {
-    await this.selectDropdownValue(staff, 3);
+    await this.page.waitForTimeout(Waits.AVG);
+    await this.selectDropdownValue(staff, 3, 'Staff Member');
     await this.page.screenshot({ path: `${this.screenshotDir}/07-staff-selected.png` });
   }
 
   async clickLogin() {
     console.log('[LOGIN] Clicking Log In button');
-    await this.page.waitForTimeout(2000);
-    const loginBtn = this.page.locator("button").filter({ hasText: /log in/i });
+    await this.page.waitForTimeout(Waits.AVG);
+    const loginBtn = this.page.locator(LoginLocators.loginButton)
+      .filter({ hasText: LoginLocators.loginButtonText });
     await loginBtn.first().click({ force: true, timeout: 10000 });
     console.log('[LOGIN] Waiting for dashboard to load');
     
-    // Wait for header container
-    await this.page.locator("[aria-label='primary-layout-header-container']").waitFor({ state: 'visible', timeout: 60000 });
+    // Wait for header container using centralized locator
+    await this.page.locator(HeaderLocators.container).waitFor({ state: 'visible', timeout: 60000 });
     console.log('[LOGIN] Dashboard header loaded');
     
     // Wait for page to be fully loaded
     await this.page.waitForLoadState('networkidle', { timeout: 30000 });
-    await this.page.waitForTimeout(3000);
+    await this.page.waitForTimeout(Waits.AVG);
     
     await this.page.screenshot({ path: `${this.screenshotDir}/08-dashboard-loaded.png` });
     console.log(`[LOGIN] Dashboard loaded successfully. Screenshots saved in: ${this.screenshotDir}`);

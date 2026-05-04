@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Test reports (generated, not source)
+testExecution/reports/
+"testExecution copy"/reports/
+backup/
+
+# Environment files with secrets
+.env
+.env.dev-f5
+.env.qa
+# Keep .env.example and .env.std-f1 (no secrets, just template/config)
+
+# Logs
+*.log
+hs_err_pid*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+build/

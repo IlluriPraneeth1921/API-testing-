@@ -18,6 +18,14 @@ export class LoginKeywords {
     await this.loginPage.selectOrganization(env.organization);
     await this.loginPage.selectLocation(env.location);
     await this.loginPage.selectStaffMember(env.staffMember);
+
+    console.log(`[LOGIN] ═══ Login Context Summary ═══`);
+    console.log(`[LOGIN]   User:         "${username}"`);
+    console.log(`[LOGIN]   Organization: "${env.organization}"`);
+    console.log(`[LOGIN]   Location:     "${env.location}"`);
+    console.log(`[LOGIN]   Staff Member: "${env.staffMember}"`);
+    console.log(`[LOGIN] ═══════════════════════════════`);
+
     await this.loginPage.clickLogin();
   }
 }

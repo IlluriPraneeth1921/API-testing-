@@ -22,6 +22,7 @@ interface StepData {
   status: string;
   duration: number;
   error?: string;
+  screenshotPath?: string;
 }
 
 let testData: TestData = {
@@ -215,6 +216,15 @@ export async function generateReport() {
                       <td class="step-duration">${(step.duration / 1000).toFixed(2)}s</td>
                     </tr>
                     ${step.error ? `<tr><td colspan="3"><div class="error">${step.error.substring(0, 500)}</div></td></tr>` : ""}
+                    ${step.screenshotPath && fs.existsSync(step.screenshotPath) ? `
+                    <tr><td colspan="3">
+                      <div style="padding:8px;">
+                        <div style="font-size:11px;color:#999;margin-bottom:4px;">📸 Failure Screenshot</div>
+                        <img src="data:image/png;base64,${fs.readFileSync(step.screenshotPath).toString('base64')}" 
+                             style="max-width:100%;border:1px solid #e0e0e0;border-radius:4px;cursor:zoom-in;"
+                             onclick="this.style.maxWidth=this.style.maxWidth==='100%'?'none':'100%'" />
+                      </div>
+                    </td></tr>` : ""}
                   `).join("")}
                 </table>
               </td>

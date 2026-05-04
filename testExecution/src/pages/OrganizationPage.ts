@@ -1,7 +1,8 @@
 import type { Page } from "playwright";
 import { expect } from "@playwright/test";
 import { getRunTimestamp } from "@src/utils/timestamp";
-import { env } from "@src/config/env";
+import { env, Waits } from "@src/config/env";
+import { SearchLocators, FormLocators, CommonLocators } from "@src/locators";
 
 export class OrganizationPage {
   private screenshotDir: string;
@@ -17,18 +18,18 @@ export class OrganizationPage {
   async navigateToOrganizations() {
     await this.page.waitForTimeout(5000);
     
-    const searchType = this.page.locator('[role="combobox"]').first();
+    const searchType = this.page.locator(SearchLocators.searchTypeCombobox).first();
     await searchType.click({ force: true });
     await this.page.waitForTimeout(2000);
     
     await this.page.screenshot({ path: `${this.screenshotDir}/org-00-dropdown.png` });
     
-    const orgOption = this.page.locator('mat-option:has-text("Organizations")');
+    const orgOption = this.page.locator(SearchLocators.organizationsOption);
     await orgOption.waitFor({ state: 'visible', timeout: 10000 });
     await orgOption.click();
     await this.page.waitForTimeout(2000);
     
-    const searchTextBox = this.page.locator('input[type="text"]').first();
+    const searchTextBox = this.page.locator(SearchLocators.searchTextBox).first();
     await searchTextBox.fill(env.organization);
     await this.page.keyboard.press('Enter');
     await this.page.waitForTimeout(5000);
@@ -39,27 +40,27 @@ export class OrganizationPage {
   async clickAddNewOrganization() {
     await this.page.waitForTimeout(5000);
     
-    const searchType = this.page.locator('[role="combobox"]').first();
+    const searchType = this.page.locator(SearchLocators.searchTypeCombobox).first();
     await searchType.click({ force: true });
     await this.page.waitForTimeout(2000);
     
-    const orgOption = this.page.locator('mat-option:has-text("Organizations")');
+    const orgOption = this.page.locator(SearchLocators.organizationsOption);
     await orgOption.waitFor({ state: 'visible', timeout: 10000 });
     await orgOption.click();
     await this.page.waitForTimeout(2000);
     
-    const searchTextBox = this.page.locator('input[type="text"]').first();
+    const searchTextBox = this.page.locator(SearchLocators.searchTextBox).first();
     await searchTextBox.fill(env.organization);
     await this.page.keyboard.press('Enter');
     await this.page.waitForTimeout(5000);
     
     await this.page.screenshot({ path: `${this.screenshotDir}/org-01-search.png` });
     
-    const addBtn = this.page.locator("text=Add New Organization").first();
+    const addBtn = this.page.locator(SearchLocators.addNewOrganizationBtn).first();
     await addBtn.waitFor({ state: 'visible', timeout: 30000 });
     await addBtn.click();
     await this.page.waitForTimeout(3000);
-    await expect(this.page.locator("h1:has-text('New Organization')")).toBeVisible();
+    await expect(this.page.locator(FormLocators.newOrganizationHeader)).toBeVisible();
     await this.page.screenshot({ path: `${this.screenshotDir}/org-02-new.png` });
   }
 
@@ -77,12 +78,12 @@ export class OrganizationPage {
       }
     }
     
-    // Check for success indicators
+    // Check for success indicators using centralized locators
     const successIndicators = [
-      "text=Organization created successfully",
-      "text=Successfully created", 
-      "text=Organization has been created",
-      "div:has-text('Success')"
+      FormLocators.successOrganizationCreated,
+      FormLocators.successCreated,
+      FormLocators.successOrgCreated,
+      FormLocators.successGeneric
     ];
     
     for (const indicator of successIndicators) {
@@ -93,9 +94,9 @@ export class OrganizationPage {
       }
     }
     
-    // Try to find Continue button
+    // Try to find Continue button using centralized locator
     const selectors = [
-      "button:has-text('Continue')",
+      CommonLocators.continueBtn,
       "//button[contains(.,'Continue')]",
       "//span[contains(text(),'Continue')]/parent::button",
       "[type='button']:has-text('Continue')"
@@ -135,12 +136,12 @@ export class OrganizationPage {
     // If no Continue button and no success indicator, this might be normal
     console.log('No Continue button found, checking if this is expected...');
     
-    // Wait a bit more and check again for organization creation
+    // Wait a bit more and check again for organization creation using centralized locators
     await this.page.waitForTimeout(5000);
     
     // Check if we're on organization details/list page
-    const onOrgPage = await this.page.locator('text=Organization').isVisible().catch(() => false);
-    const hasOrgData = await this.page.locator('table, .organization, [class*="org"]').isVisible().catch(() => false);
+    const onOrgPage = await this.page.locator(FormLocators.organizationText).isVisible().catch(() => false);
+    const hasOrgData = await this.page.locator(FormLocators.organizationContainer).isVisible().catch(() => false);
     
     if (onOrgPage || hasOrgData) {
       console.log('Appears to be on organization page, Continue not needed');
@@ -155,12 +156,12 @@ export class OrganizationPage {
   }
 
   async verifyValidationErrors() {
-    await expect(this.page.locator('text=The required field "Full Name" has not been completed.').first()).toBeVisible();
-    await expect(this.page.locator('text=The required field "Short Name" has not been completed.').first()).toBeVisible();
-    await expect(this.page.locator('text=At least one field of the following is required').first()).toBeVisible();
+    await expect(this.page.locator(FormLocators.validationFullName).first()).toBeVisible();
+    await expect(this.page.locator(FormLocators.validationShortName).first()).toBeVisible();
+    await expect(this.page.locator(FormLocators.validationAtLeastOne).first()).toBeVisible();
     await this.page.screenshot({ path: `${this.screenshotDir}/org-03-validation.png` });
     
-    const closeBtn = this.page.locator('[class*="mini-fab"]').first();
+    const closeBtn = this.page.locator(FormLocators.closeButton).first();
     await closeBtn.click();
     await this.page.waitForTimeout(2000);
   }
@@ -170,19 +171,19 @@ export class OrganizationPage {
     this.shortName = 'KSSN' + Math.random().toString(36).substring(2, 6).toUpperCase();
     this.npi = Math.floor(1000000000 + Math.random() * 9000000000).toString();
 
-    await this.page.locator('input[id^="fullName"]').fill(this.fullName);
-    await this.page.locator('input[id^="shortName"]').fill(this.shortName);
-    await this.page.locator('input[id^="nationalProviderIdentifier"]').fill(this.npi);
+    await this.page.locator(FormLocators.fullNameInput).fill(this.fullName);
+    await this.page.locator(FormLocators.shortNameInput).fill(this.shortName);
+    await this.page.locator(FormLocators.npiInput).fill(this.npi);
     await this.page.screenshot({ path: `${this.screenshotDir}/org-04-filled.png` });
   }
 
   async verifyPotentialDuplicates() {
-    await expect(this.page.locator("div:has-text('Potential Duplicates')").first()).toBeVisible();
+    await expect(this.page.locator(FormLocators.potentialDuplicates).first()).toBeVisible();
     await this.page.screenshot({ path: `${this.screenshotDir}/org-05-duplicates.png` });
   }
 
   async verifyPotentialMMISMatches() {
-    await expect(this.page.locator("div:has-text('Potential MMIS Matches')").first()).toBeVisible();
+    await expect(this.page.locator(FormLocators.potentialMMISMatches).first()).toBeVisible();
     await this.page.screenshot({ path: `${this.screenshotDir}/org-06-mmis.png` });
   }
 
@@ -190,11 +191,11 @@ export class OrganizationPage {
     await this.page.waitForTimeout(2000);
     await this.page.screenshot({ path: `${this.screenshotDir}/org-06b-before-mmis-continue.png` });
     
-    // Try multiple selectors
+    // Try multiple selectors using centralized locators
     const selectors = [
       "//button[contains(.,'Continue')]",
       "//span[contains(text(),'Continue')]/parent::button",
-      "button:has-text('Continue')",
+      CommonLocators.continueBtn,
       "[type='button']:has-text('Continue')"
     ];
     
@@ -231,13 +232,13 @@ export class OrganizationPage {
     await this.page.screenshot({ path: `${this.screenshotDir}/org-07-create.png` });
     
     // Check what's actually on the page
-    const mmisStillVisible = await this.page.locator("div:has-text('Potential MMIS Matches')").first().isVisible().catch(() => false);
+    const mmisStillVisible = await this.page.locator(FormLocators.potentialMMISMatches).first().isVisible().catch(() => false);
     console.log(`MMIS page still visible: ${mmisStillVisible}`);
     
-    const createOrgVisible = await this.page.locator("div:has-text('Create Organization')").first().isVisible();
+    const createOrgVisible = await this.page.locator(FormLocators.createOrganizationHeader).first().isVisible();
     console.log(`Create Organization text visible: ${createOrgVisible}`);
     
-    await expect(this.page.locator("div:has-text('Create Organization')").first()).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(FormLocators.createOrganizationHeader).first()).toBeVisible({ timeout: 10000 });
     await this.page.waitForTimeout(8000);
   }
 
@@ -251,8 +252,8 @@ export class OrganizationPage {
     console.log('Page title:', await this.page.title());
     
     // The "Create Organization" page actually has a Continue button, not Create
-    // Look for Continue button first
-    const continueBtn = this.page.locator("button:has-text('Continue')").last();
+    // Look for Continue button first using centralized locator
+    const continueBtn = this.page.locator(CommonLocators.continueBtn).last();
     const continueCount = await continueBtn.count();
     
     if (continueCount > 0) {
@@ -270,13 +271,13 @@ export class OrganizationPage {
       }
     }
     
-    // If no Continue button, try Create button selectors
+    // If no Continue button, try Create button selectors using centralized locators
     const selectors = [
-      "button:has-text('Create')",
+      FormLocators.createButton,
       "//button[contains(text(),'Create')]",
       "//span[contains(text(),'Create')]",
       "input[value='Create']",
-      "input[type='submit']",
+      FormLocators.submitButton,
       "button[type='submit']"
     ];
     

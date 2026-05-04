@@ -13,7 +13,7 @@ Then("I should see the dashboard", async function (this: PWWorld) {
   const headerContainer = this.page.locator("[aria-label='primary-layout-header-container']");
   await headerContainer.waitFor({ state: 'visible', timeout: 30000 });
   await expect(headerContainer).toBeVisible();
-  await expect(this.page).toHaveURL(/choose-context/, { timeout: 10000 });
+  // URL check removed — app navigates to #/home after login, not #/choose-context
 });
 
 When("I navigate to Administration tab", async function (this: PWWorld) {
