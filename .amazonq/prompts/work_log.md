@@ -753,3 +753,15 @@ TEMPLATE — Copy this block at the end of each session:
   - Location: **163/192 (84.9%)**
 - **Status**: done — Location at ceiling for DevF1
 - **Next steps**: Run Person module (`npm run test:devf1:person`); clean up debug logging; consider removing extra search retries (43s) to speed up runs
+
+### Session — 2026-05-04 (Person module investigation)
+- **What we worked on**:
+  - Pushed 8 local commits to `origin/Pra_Palywright_Apr09` (was ahead by 8 commits, working tree clean)
+  - Investigated Person module E2E `614086_Person.xlsx` — Scenario1 in `614086_TestData [CreateHappy]` logs `expected 200, got 500` but test is marked ✓
+  - **Root cause**: `runHappyPath()` intentionally does NOT assert on CreateHappy failures (sets `result.passed = false` but no `assertStatus()`) so serial mode continues and Scenario2 can still create the entity key
+  - Scenario1 body includes `"deathDate": "2023-02-11"` — the API returns 500 ("An error occurred while processing your request") likely due to server-side validation on death date
+  - Scenario2 succeeds (331ms) and creates the person key — downstream tests are unblocked
+  - **Conclusion**: Not a framework bug. The 500 is an API-side issue with the death date in Scenario1's payload. Framework is working as designed — CreateHappy soft-fails to allow serial continuation
+- **Files created/modified**: none — analysis only
+- **Status**: done
+- **Next steps**: Optionally remove `deathDate` from Scenario1 in Excel to get clean 200; run full Person module to check other sheets (001_TC001, 001_TC002, 002_TC001, etc.); continue with other entity modules

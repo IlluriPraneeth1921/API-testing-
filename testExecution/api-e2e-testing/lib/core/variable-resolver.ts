@@ -88,7 +88,7 @@ function generateTier2(baseUrl: string, resource: string): ResolvedVars {
     strPhoneNumber: '1 (555) 123-4567',
     strPhoneNumber1: '1 (555) 123-4567',
     strPhoneNumber2: '1 (555) 123-4568',
-    strNumber: '1 (555) 123-4567',
+    strNumber: `${Math.floor(100000000 + Math.random() * 900000000)}`,
 
     // ── Dates ──
     strStartDate: `${isoToday}T00:00:00.000Z`,
@@ -397,7 +397,7 @@ export class VariableResolver {
       strPhoneNumber: `1 (${String(Math.floor(200 + Math.random() * 800))}) ${String(Math.floor(200 + Math.random() * 800))}-${String(Math.floor(1000 + Math.random() * 9000))}`,
       strPhoneNumber1: `1 (${String(Math.floor(200 + Math.random() * 800))}) ${String(Math.floor(200 + Math.random() * 800))}-${String(Math.floor(1000 + Math.random() * 9000))}`,
       strPhoneNumber2: `1 (${String(Math.floor(200 + Math.random() * 800))}) ${String(Math.floor(200 + Math.random() * 800))}-${String(Math.floor(1000 + Math.random() * 9000))}`,
-      strNumber: `1 (${String(Math.floor(200 + Math.random() * 800))}) ${String(Math.floor(200 + Math.random() * 800))}-${String(Math.floor(1000 + Math.random() * 9000))}`,
+      strNumber: `${Math.floor(100000000 + Math.random() * 900000000)}`,
     };
     for (const [k, v] of Object.entries(fields)) this.cache[k] = v;
   }

@@ -4,6 +4,13 @@
     "getRoute": "/api/v1/case-module/case/{key}",
     "searchRoute": "/api/v1/case-module/cases"
   },
+  "Person": {
+    "postRoute": "/api/v1/person-module/person",
+    "getRoute": "/api/v1/person-module/person/{key}",
+    "searchRoute": "/api/v1/person-module/person",
+    "updateMethod": "POST",
+    "updateRoute": "/api/v1/person-module/person/{key}"
+  },
   "ProfilePicture": {
     "postRoute": "/api/v1/person-module/person/{personKey}/profile-picture",
     "getRoute": "/api/v1/person-module/person/{personKey}/profile-picture"
