@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>API E2E Testing — Quick Reference Guide</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; margin: 20px 40px; background: #f5f7fa; color: #1a1a2e; }
+  h1 { color: #0f3460; border-bottom: 3px solid #e94560; padding-bottom: 8px; }
+  h2 { color: #16213e; margin-top: 30px; border-left: 4px solid #e94560; padding-left: 10px; }
+  h3 { color: #0f3460; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th { background: #16213e; color: #fff; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 6px 12px; }
+  tr:nth-child(even) { background: #eef2f7; }
+  code { background: #1a1a2e; color: #00ff88; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  pre { background: #1a1a2e; color: #00ff88; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+  .cmd { background: #0f3460; color: #fff; padding: 10px 14px; border-radius: 6px; margin: 6px 0; font-family: monospace; font-size: 13px; }
+  .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 8px 12px; margin: 8px 0; }
+  .info { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 8px 12px; margin: 8px 0; }
+  .success { background: #d4edda; border-left: 4px solid #28a745; padding: 8px 12px; margin: 8px 0; }
+  .toc { background: #fff; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .toc a { text-decoration: none; color: #0f3460; display: block; padding: 3px 0; }
+  .toc a:hover { color: #e94560; }
+</style>
+</head>
+<body>
+
+<h1>🚀 API E2E Testing — Quick Reference Guide</h1>
+<p><strong>Project:</strong> <code>testExecution/api-e2e-testing</code> | <strong>Stack:</strong> Playwright + TypeScript + Cognito Auth</p>
+
+<div class="toc">
+  <strong>📋 Table of Contents</strong>
+  <a href="#setup">1. Setup & Prerequisites</a>
+  <a href="#commands">2. Run Commands — Smoke, Regression, Module-wise</a>
+  <a href="#aggregates">3. All Aggregates & Excel Files (172 files)</a>
+  <a href="#envs">4. Environments & Auth</a>
+  <a href="#debug">5. Debugging & Troubleshooting</a>
+  <a href="#output">6. Output & Reports</a>
+  <a href="#pipeline">7. Azure Pipeline</a>
+</div>
+
+<!-- Section 1 -->
+<h2 id="setup">1. Setup & Prerequisites</h2>
+<pre>
+cd testExecution/api-e2e-testing
+npm install
+npx playwright install
+</pre>
+<div class="info">Excel test data files go in: <code>API-TestData/</code> folder (172 .xlsx files)</div>
+
+<table>
+  <tr><th>Prerequisite</th><th>Details</th></tr>
+  <tr><td>Node.js</td><td>v20.x+</td></tr>
+  <tr><td>Playwright</td><td>v1.49+</td></tr>
+  <tr><td>Network</td><td>Access to Cognito + API endpoints</td></tr>
+  <tr><td>Excel Files</td><td>Place in <code>API-TestData/</code> folder</td></tr>
+  <tr><td>Environment</td><td>Default: DevF1 (configurable via ENV_NAME)</td></tr>
+</table>
+
+<!-- Section 2 -->
+<h2 id="commands">2. Run Commands</h2>
+
+<h3>🔥 Quick Smoke Test (2 scenarios per sheet)</h3>
+<div class="cmd">npm run test:excel:smoke</div>
+<div class="cmd">cross-env MAX_SCENARIOS=2 SKIP_SQL=true npx playwright test excel-driven-e2e</div>
+
+<h3>📦 Full Regression (All 172 Excel files)</h3>
+<div class="cmd">npm run test:excel</div>
+<div class="cmd">cross-env ENV_NAME=DevF1 npx playwright test excel-driven-e2e</div>
+
+<h3>🎯 Single Entity / File</h3>
+<div class="cmd">cross-env EXCEL=609768_Appointment.xlsx npx playwright test excel-driven-e2e</div>
+<div class="cmd">cross-env EXCEL=Appointment npx playwright test excel-driven-e2e</div>
+<div class="cmd">cross-env TFS=609768 npx playwright test excel-driven-e2e</div>
+
+<h3>📂 Module-Specific Tests</h3>
+<div class="cmd">npx playwright test org-module-e2e</div>
+<div class="cmd">npx playwright test note-module-e2e</div>
+
+<h3>🔍 Filter by Test Type</h3>
+<table>
+  <tr><th>Type</th><th>Command</th></tr>
+  <tr><td>Happy Path Only</td><td><code>cross-env TEST_TYPE=happy npx playwright test excel-driven-e2e</code></td></tr>
+  <tr><td>Negative Only</td><td><code>npm run test:excel:negative</code></td></tr>
+  <tr><td>Search Only</td><td><code>npm run test:excel:search</code></td></tr>
+  <tr><td>Error Codes</td><td><code>cross-env TEST_TYPE=error npx playwright test excel-driven-e2e</code></td></tr>
+  <tr><td>Combo Tests</td><td><code>cross-env TEST_TYPE=combo npx playwright test excel-driven-e2e</code></td></tr>
+</table>
+
+<h3>⚙️ Skip Options</h3>
+<table>
+  <tr><th>Option</th><th>Command</th></tr>
+  <tr><td>Skip SQL</td><td><code>npm run test:excel:nosql</code></td></tr>
+  <tr><td>Skip POST</td><td><code>cross-env SKIP_POST=true npx playwright test</code></td></tr>
+  <tr><td>Parallel (4 workers)</td><td><code>npm run test:excel:parallel</code></td></tr>
+</table>
+
+<h3>🌍 Environment-Specific</h3>
+<div class="cmd">npm run test:devf1</div>
+<div class="cmd">npm run test:f1</div>
+<div class="cmd">npm run test:f5</div>
+
+<!-- Section 3 — Aggregates placeholder -->
+<h2 id="aggregates">3. All Aggregates & Excel Files</h2>
+<p><em>See next section below...</em></p>
+
+<!-- Section 4 -->
+<h2 id="envs">4. Environments & Auth</h2>
+<table>
+  <tr><th>Env</th><th>Base URL</th><th>Auth Env</th></tr>
+  <tr><td>DevF1</td><td>https://standard-devf1-carity.lower-bluecompass-01.aws.feisystems.com</td><td>StdDevF1</td></tr>
+  <tr><td>F1</td><td>https://standard-f1-carity.feisystemsh2env.com</td><td>F1</td></tr>
+  <tr><td>F5</td><td>https://standard-f5-carity.feisystemsh2env.com</td><td>F5</td></tr>
+</table>
+<div class="warn">⚠️ Auth uses Cognito SDK → JWT access token (cached 55 min). Token auto-refreshes on 401.</div>
+
+<!-- Section 5 -->
+<h2 id="debug">5. Debugging & Troubleshooting</h2>
+<table>
+  <tr><th>Issue</th><th>Fix</th></tr>
+  <tr><td>No Excel files matched</td><td>Check <code>API-TestData/</code> folder has .xlsx files. Filename format: <code>&lt;TFS_ID&gt;_&lt;Entity&gt;.xlsx</code></td></tr>
+  <tr><td>Cognito auth failed</td><td>Verify AUTH_USERNAME/PASSWORD in <code>env_config.json</code>. Check network access to Cognito.</td></tr>
+  <tr><td>401 Unauthorized</td><td>Token auto-retries once. If persists, check credentials or user pool config in <code>lib/auth.ts</code></td></tr>
+  <tr><td>Route not found (404)</td><td>Add entity to <code>config/route-registry.json</code> or check Swagger auto-resolve</td></tr>
+  <tr><td>SQL connection failed</td><td>Use <code>SKIP_SQL=true</code> or verify SQL_SERVER/SQL_DATABASE in env_config.json</td></tr>
+  <tr><td>Timeout errors</td><td>Auto-retries 3x with 3s delay. Increase timeout in <code>playwright.config.ts</code></td></tr>
+  <tr><td>Variable not resolved</td><td>Check SQL lookup keys. Use <code>SKIP_SQL=true</code> to bypass. Check <code>lib/core/variable-resolver.ts</code></td></tr>
+  <tr><td>Files starting with x</td><td>Files prefixed with <code>x</code> are excluded (e.g. <code>x647985_Guardianship.xlsx</code>)</td></tr>
+</table>
+
+<h3>Debug Mode</h3>
+<pre>
+# Run with Playwright debug UI
+npx playwright test excel-driven-e2e --debug
+
+# Run with verbose logging
+npx playwright test excel-driven-e2e --reporter=list
+
+# View last report
+npm run report
+</pre>
+
+<!-- Section 6 -->
+<h2 id="output">6. Output & Reports</h2>
+<div class="info">Results saved to: <code>output/&lt;EntityName&gt;_E2E_&lt;timestamp&gt;/</code></div>
+<table>
+  <tr><th>File</th><th>Description</th></tr>
+  <tr><td>00_keys.json</td><td>Entity keys, environment, resolved variables</td></tr>
+  <tr><td>*_payload.json</td><td>POST/PUT request payloads</td></tr>
+  <tr><td>*_response.json</td><td>API responses</td></tr>
+  <tr><td>playwright-report/</td><td>Playwright HTML report (<code>npm run report</code> to view)</td></tr>
+</table>
+
+<!-- Section 7 -->
+<h2 id="pipeline">7. Azure Pipeline</h2>
+<pre>
+# Pipeline parameters:
+#   environment: DevF1 | F1 | F5
+#   excel: specific file (blank = all)
+#   module: module filter
+#   testType: happy | negative | search | error | combo
+#   maxScenarios: 0 = all
+#   skipSql: true/false
+#   workers: 1-4
+#   shardTotal: 1-8 (parallel agents)
+</pre>
+
+<hr>
+<p style="color:#888; font-size:12px;">Generated for api-e2e-testing | Last updated: <script>document.write(new Date().toLocaleDateString())</script></p>
+
+</body>
+</html>

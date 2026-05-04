@@ -272,7 +272,7 @@ export class BulkAssignmentPage {
   async verifySelectAllButtonNotDisplayed() {
     // PBI 915981: Select All Records button should never display
     console.log('[BULK_ASSIGNMENT] Verifying Select All Records button not displayed');
-    await expect(this.page.locator('button:has-text("Select All Records")')).not.toBeVisible();
+    await expect(this.page.locator(BulkAssignmentLocators.selectAllRecordsBtn)).not.toBeVisible();
   }
 
   // ═══ COMPLETE WORKFLOWS ═══

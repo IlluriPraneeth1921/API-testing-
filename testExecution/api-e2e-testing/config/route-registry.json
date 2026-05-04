@@ -1,0 +1,11 @@
+{
+  "Case": {
+    "postRoute": "/api/v1/case-module",
+    "getRoute": "/api/v1/case-module/case/{key}",
+    "searchRoute": "/api/v1/case-module/cases"
+  },
+  "ProfilePicture": {
+    "postRoute": "/api/v1/person-module/person/{personKey}/profile-picture",
+    "getRoute": "/api/v1/person-module/person/{personKey}/profile-picture"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "birthDate": "1981-11-23",
+  "gender": {
+    "codeSystemIdentifier": "1",
+    "name": "Male",
+    "code": "200001"
+  },
+  "organizationKey": "${strOrganizationKey}",
+  "preferredMethodOfContact": {
+    "codeSystemIdentifier": "1",
+    "name": "Email",
+    "code": "3000003"
+  },
+  "staffMemberName": {
+    "firstName": "${strFirstName}",
+    "lastName": "${strLastName}",
+    "maidenName": "${strLastName}",
+    "middleName": "${strMiddleName}",
+    "preferredName": "${strFirstName}",
+    "prefixName": "Mrs",
+    "suffixName": "${strFirstName}"
+  },
+  "staffJobTitle": {
+    "codeSystemIdentifier": "1",
+    "name": "Mentor",
+    "code": "84000007"
+  },
+  "isReceivingEmailNotification": true,
+  "isReceivingTextNotification": true,
+  "staffMemberCredentials": [
+    {
+      "category": {
+        "codeSystemIdentifier": "1",
+        "name": "Accredited",
+        "code": "41000004"
+      },
+      "effectiveDateRange": {
+        "startDate": "${strStartDate}",
+        "endDate": "${strEndDate}"
+      },
+      "includeInDisplayName": true,
+      "issuerName": "Test Issuer",
+      "note": "Staff credential testing",
+      "qualificationNumber": "${strQualificationNumber}",
+      "type": {
+        "codeSystemIdentifier": "1",
+        "name": "Accredited",
+        "code": "41000004"
+      }
+    }
+  ],
+  "staffMemberEmailAddresses": [
+    {
+      "email": "${strEmail1}",
+      "isPrimary": true,
+      "note": "Primary staff email"
+    },
+    {
+      "email": "${strEmail2}",
+      "isPrimary": false,
+      "note": "Secondary staff email"
+    }
+  ],
+  "staffMemberIdentifiers": [
+    {
+      "effectiveDateRange": {
+        "startDate": "${strStartDate}",
+        "endDate": "${strEndDate}"
+      },
+      "note": "Staff identifier testing",
+      "type": {
+        "codeSystemIdentifier": "1",
+        "name": "NPI",
+        "code": "1000005"
+      },
+      "value": "${strIdentifier1}"
+    }
+  ],
+  "staffMemberPhones": [
+    {
+      "extension": "12345",
+      "isPrimary": true,
+      "isTextTelephone": true,
+      "note": "Staff phone testing",
+      "number": "${strPhoneNumber1}",
+      "phoneType": {
+        "codeSystemIdentifier": "1",
+        "name": "Home",
+        "code": "400003"
+      }
+    },
+    {
+      "extension": "12346",
+      "isPrimary": false,
+      "isTextTelephone": false,
+      "note": "Staff phone testing 2",
+      "number": "${strPhoneNumber2}",
+      "phoneType": {
+        "codeSystemIdentifier": "1",
+        "name": "Facility",
+        "code": "400009"
+      }
+    }
+  ],
+  "staffMemberLanguages": [
+    {
+      "humanLanguage": {
+        "codeSystemIdentifier": "1",
+        "name": "English",
+        "code": "100001"
+      },
+      "isPrimary": true,
+      "readingProficiency": {
+        "codeSystemIdentifier": "1",
+        "name": "Fluent",
+        "code": "100101"
+      },
+      "speakingProficiency": {
+        "codeSystemIdentifier": "1",
+        "name": "Fluent",
+        "code": "100101"
+      },
+      "writingProficiency": {
+        "codeSystemIdentifier": "1",
+        "name": "Fluent",
+        "code": "100101"
+      }
+    }
+  ]
+}

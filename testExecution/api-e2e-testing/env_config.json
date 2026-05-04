@@ -1,0 +1,35 @@
+{
+    "DevF1": {
+        "BASE_URL": "https://standard-devf1-carity.lower-bluecompass-01.aws.feisystems.com",
+        "AUTH_ENV": "StdDevF1",
+        "AUTH_USERNAME": "George.Parker",
+        "AUTH_PASSWORD": "Password123#",
+        "SQL_SERVER": "mcs-mst-carity-v1-4929c-appdb.c4sblwrbqinq.us-east-1.rds.amazonaws.com",
+        "SQL_DATABASE": "Standard.DevF1.Carity",
+        "CONTEXT_ORG_KEY": "a6342be6-9484-4856-b0d2-ac0500da8f64",
+        "CONTEXT_LOC_KEY": "ce37659c-7aea-497c-a5d0-ac0500daaefb",
+        "CONTEXT_STAFF_KEY": "8aec7af9-415a-49f9-9d92-ac0500dadf73"
+    },
+    "F1": {
+        "BASE_URL": "https://standard-f1-carity.feisystemsh2env.com",
+        "AUTH_ENV": "F1",
+        "AUTH_USERNAME": "George.Parker",
+        "AUTH_PASSWORD": "Password123#",
+        "SQL_SERVER": "mcs-mst-carity-v1-697a8-appdb.cqgoe5gpkllx.us-east-1.rds.amazonaws.com",
+        "SQL_DATABASE": "Standard.F1.Carity",
+        "CONTEXT_ORG_KEY": "a6342be6-9484-4856-b0d2-ac0500da8f64",
+        "CONTEXT_LOC_KEY": "ce37659c-7aea-497c-a5d0-ac0500daaefb",
+        "CONTEXT_STAFF_KEY": "8aec7af9-415a-49f9-9d92-ac0500dadf73"
+    },
+    "F5": {
+        "BASE_URL": "https://standard-f5-carity.feisystemsh2env.com",
+        "AUTH_ENV": "F5",
+        "AUTH_USERNAME": "George.Parker",
+        "AUTH_PASSWORD": "Password123#",
+        "SQL_SERVER": "mcs-mst-carity-v1-697a8-appdb.cqgoe5gpkllx.us-east-1.rds.amazonaws.com",
+        "SQL_DATABASE": "Standard.F5.Carity",
+        "CONTEXT_ORG_KEY": "a6342be6-9484-4856-b0d2-ac0500da8f64",
+        "CONTEXT_LOC_KEY": "ce37659c-7aea-497c-a5d0-ac0500daaefb",
+        "CONTEXT_STAFF_KEY": "8aec7af9-415a-49f9-9d92-ac0500dadf73"
+    }
+}

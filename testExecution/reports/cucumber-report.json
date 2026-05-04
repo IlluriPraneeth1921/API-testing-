@@ -2451,8 +2451,281 @@
               "location": "src\\steps\\bulk-assignment.steps.ts:1295"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 7485000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 9,
+            "name": "I navigate to Contact Form",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8633677400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 10,
+            "name": "I should see contact form columns",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:42"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 20284716200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 11,
+            "name": "I navigate to Queries",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:66"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8724431400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "I click filter list",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:72"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2535225899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "I select Person Assignments",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:78"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1020196399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "I select My CaseLoad",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:84"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2504499699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 15,
+            "name": "I click Run Query",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:90"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5531840999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 16,
+            "name": "I should see query results columns",
+            "match": {
+              "location": "src\\steps\\login.steps.ts:96"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 203578199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 17,
+            "name": "I click Add New Organization",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:6"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 19265767900
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "I click Continue without filling required fields",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 9237559500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 19,
+            "name": "I should see validation errors for required fields",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:16"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2559006200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 20,
+            "name": "I fill organization details with random data",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:21"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1125333899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 21,
+            "name": "I click Continue",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:26"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8757626599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 22,
+            "name": "I should see Potential Duplicates page",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:31"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 338369799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 23,
+            "name": "I click Continue",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:26"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8900186900
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 24,
+            "name": "I should see Potential MMIS Matches page",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:36"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 222234499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 25,
+            "name": "I click Continue",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:26"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8752508000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 26,
+            "name": "I should see Create Organization page",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 16220946199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 27,
+            "name": "I click Create",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:46"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 11895286800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 28,
+            "name": "I click Continue",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:26"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 8512068499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 29,
+            "name": "I should see the created organization",
+            "match": {
+              "location": "src\\steps\\organization.steps.ts:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 174990900
             }
           },
           {

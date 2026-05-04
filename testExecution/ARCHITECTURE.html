@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDD Framework Architecture - Complete Guide</title>
+<style>
+  :root { --primary: #1a73e8; --bg: #f8f9fa; --card: #fff; --border: #e0e0e0; --text: #333; --code-bg: #1e1e1e; --code-text: #d4d4d4; --green: #34a853; --red: #ea4335; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  h1 { text-align: center; color: var(--primary); margin: 30px 0 10px; font-size: 2em; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+  nav { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 30px; }
+  nav h2 { margin-bottom: 10px; font-size: 1.1em; }
+  nav ol { padding-left: 20px; columns: 2; }
+  nav a { color: var(--primary); text-decoration: none; }
+  nav a:hover { text-decoration: underline; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 24px; }
+  section h2 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 16px; }
+  section h3 { margin: 16px 0 8px; color: #444; }
+  .location { background: #e8f0fe; padding: 6px 12px; border-radius: 4px; display: inline-block; margin-bottom: 12px; font-family: monospace; font-size: 0.9em; }
+  ul, ol { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  pre { background: var(--code-bg); color: var(--code-text); padding: 16px; border-radius: 6px; overflow-x: auto; margin: 12px 0; font-size: 0.85em; }
+  .keyword { color: #569cd6; }
+  .string { color: #ce9178; }
+  .comment { color: #6a9955; }
+  .func { color: #dcdcaa; }
+  .flow-diagram { text-align: center; padding: 20px; }
+  .flow-diagram .layer { display: inline-block; background: var(--primary); color: #fff; padding: 10px 24px; border-radius: 6px; margin: 4px 0; min-width: 280px; }
+  .flow-diagram .arrow { display: block; font-size: 1.5em; color: var(--primary); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th { background: var(--primary); color: #fff; padding: 10px; text-align: left; }
+  td { padding: 10px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) { background: #f5f5f5; }
+  .check { color: var(--green); } .cross { color: var(--red); }
+  .benefits-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+  .benefit-card { background: #f0f7ff; border-left: 4px solid var(--primary); padding: 14px; border-radius: 0 6px 6px 0; }
+  .benefit-card h4 { color: var(--primary); margin-bottom: 6px; }
+  .summary-box { background: #e6f4ea; border: 1px solid #34a853; border-radius: 8px; padding: 20px; margin-top: 16px; }
+  .summary-box ul { list-style: none; padding: 0; }
+  .summary-box li::before { content: "✅ "; }
+  @media (max-width: 700px) { .benefits-grid { grid-template-columns: 1fr; } nav ol { columns: 1; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📐 BDD Framework Architecture</h1>
+<p class="subtitle">Complete Guide for the Team</p>
+
+<nav>
+  <h2>📋 Table of Contents</h2>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#feature-files">Feature Files</a></li>
+    <li><a href="#step-definitions">Step Definitions</a></li>
+    <li><a href="#keywords">Keywords Layer</a></li>
+    <li><a href="#page-objects">Page Objects</a></li>
+    <li><a href="#flow">Architecture Flow</a></li>
+    <li><a href="#benefits">Benefits</a></li>
+  </ol>
+</nav>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <h2>1. Overview</h2>
+  <p>This framework follows a <strong>Three-Layer Architecture</strong> pattern for BDD test automation. Its purpose is to separate concerns, improve maintainability, and enable non-technical stakeholders to understand tests.</p>
+  <div class="flow-diagram">
+    <div class="layer">Feature Files (Gherkin)</div><span class="arrow">↓</span>
+    <div class="layer">Step Definitions (Glue Code)</div><span class="arrow">↓</span>
+    <div class="layer">Keywords (Business Logic)</div><span class="arrow">↓</span>
+    <div class="layer">Page Objects (UI Interactions)</div><span class="arrow">↓</span>
+    <div class="layer">Playwright (Browser Automation)</div>
+  </div>
+</section>
+
+<!-- FEATURE FILES -->
+<section id="feature-files">
+  <h2>2. Feature Files</h2>
+  <div class="location">/features/*.feature</div>
+  <h3>Purpose</h3>
+  <ul>
+    <li>Define test scenarios in plain English using Gherkin syntax</li>
+    <li>Enable collaboration between business analysts, QA, and developers</li>
+    <li>Serve as living documentation of application behavior</li>
+    <li>Make tests readable by non-technical stakeholders</li>
+  </ul>
+  <h3>Example</h3>
+  <pre><span class="keyword">Feature:</span> Organization Management
+
+  <span class="keyword">Scenario:</span> Create new organization with validation
+    <span class="keyword">Given</span> I login with username <span class="string">"admin"</span> and password <span class="string">"password"</span>
+    <span class="keyword">When</span> I navigate to Organizations
+    <span class="keyword">And</span> I click Add New Organization
+    <span class="keyword">Then</span> I should see validation errors for required fields</pre>
+  <h3>Why Gherkin?</h3>
+  <ul>
+    <li><strong>Business-readable</strong> — Anyone can understand what's being tested</li>
+    <li><strong>Reusable steps</strong> — Same step can be used across multiple scenarios</li>
+    <li><strong>Documentation</strong> — Features describe actual business requirements</li>
+    <li><strong>Traceability</strong> — Link tests directly to requirements</li>
+  </ul>
+</section>
+
+<!-- STEP DEFINITIONS -->
+<section id="step-definitions">
+  <h2>3. Step Definitions</h2>
+  <div class="location">/src/steps/*.steps.ts</div>
+  <h3>Purpose</h3>
+  <ul>
+    <li>Map Gherkin steps to executable TypeScript code</li>
+    <li>Act as the "glue" between feature files and implementation</li>
+    <li>Keep logic minimal — delegate to Keywords or Page Objects</li>
+    <li>Provide type-safe access to shared context (PWWorld)</li>
+  </ul>
+  <h3>Example</h3>
+  <pre><span class="func">Given</span>(<span class="string">"I login with username {string} and password {string}"</span>,
+  <span class="keyword">async function</span> (<span class="keyword">this</span>: PWWorld, username: <span class="keyword">string</span>, password: <span class="keyword">string</span>) {
+    <span class="keyword">const</span> kw = <span class="keyword">new</span> <span class="func">LoginKeywords</span>(<span class="keyword">this</span>.page);
+    <span class="keyword">await</span> kw.<span class="func">login</span>(username, password);
+  }
+);</pre>
+  <h3>Key Responsibilities</h3>
+  <ol>
+    <li><strong>Parameter extraction</strong> — Get values from Gherkin steps</li>
+    <li><strong>Instantiation</strong> — Create Keywords or Page Object instances</li>
+    <li><strong>Delegation</strong> — Call appropriate methods from lower layers</li>
+    <li><strong>Context management</strong> — Access shared state via <code>this.page</code>, <code>this.browser</code></li>
+  </ol>
+  <h3>Why Step Definitions?</h3>
+  <ul>
+    <li><strong>Decoupling</strong> — Separate test intent from implementation</li>
+    <li><strong>Reusability</strong> — One step definition used in multiple scenarios</li>
+    <li><strong>Maintainability</strong> — Change implementation without changing feature files</li>
+    <li><strong>Type safety</strong> — TypeScript ensures correct parameter types</li>
+  </ul>
+</section>
+
+<!-- KEYWORDS LAYER -->
+<section id="keywords">
+  <h2>4. Keywords Layer</h2>
+  <div class="location">/src/keywords/*.ts</div>
+  <h3>Purpose</h3>
+  <ul>
+    <li>Encapsulate complex business workflows</li>
+    <li>Orchestrate multiple page object calls</li>
+    <li>Implement business logic and validation rules</li>
+    <li>Provide high-level test actions</li>
+  </ul>
+  <h3>Example</h3>
+  <pre><span class="keyword">export class</span> <span class="func">LoginKeywords</span> {
+  <span class="keyword">private</span> loginPage: LoginPage;
+
+  <span class="func">constructor</span>(<span class="keyword">private</span> page: Page) {
+    <span class="keyword">this</span>.loginPage = <span class="keyword">new</span> <span class="func">LoginPage</span>(page);
+  }
+
+  <span class="keyword">async</span> <span class="func">login</span>(username: <span class="keyword">string</span>, password: <span class="keyword">string</span>) {
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">open</span>();
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">enterCredentials</span>(username, password);
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">clickSignIn</span>();
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">handleAcknowledgeButton</span>();
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">selectOrganization</span>(env.organization);
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">selectLocation</span>(env.location);
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">selectStaffMember</span>(env.staffMember);
+    <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">clickLogin</span>();
+  }
+}</pre>
+  <h3>Key Responsibilities</h3>
+  <ol>
+    <li><strong>Workflow orchestration</strong> — Combine multiple page actions into business flows</li>
+    <li><strong>Business logic</strong> — Implement conditional logic based on business rules</li>
+    <li><strong>Data management</strong> — Handle test data and state</li>
+    <li><strong>Abstraction</strong> — Hide implementation details from step definitions</li>
+  </ol>
+  <h3>When to Use Keywords?</h3>
+  <ul>
+    <li><span class="check">✅</span> Multi-step business workflows (e.g., complete login flow)</li>
+    <li><span class="check">✅</span> Complex scenarios requiring multiple page interactions</li>
+    <li><span class="check">✅</span> Business logic that spans multiple pages</li>
+    <li><span class="check">✅</span> Reusable high-level actions</li>
+  </ul>
+  <h3>When NOT to Use Keywords?</h3>
+  <ul>
+    <li><span class="cross">❌</span> Simple single-page actions (use Page Objects directly)</li>
+    <li><span class="cross">❌</span> Pure UI interactions (belongs in Page Objects)</li>
+  </ul>
+</section>
+
+<!-- PAGE OBJECTS -->
+<section id="page-objects">
+  <h2>5. Page Objects</h2>
+  <div class="location">/src/pages/*.ts</div>
+  <h3>Purpose</h3>
+  <ul>
+    <li>Encapsulate UI elements and interactions for a specific page</li>
+    <li>Provide atomic, reusable actions</li>
+    <li>Hide locator details from higher layers</li>
+    <li>Centralize element selectors for easy maintenance</li>
+  </ul>
+  <h3>Example</h3>
+  <pre><span class="keyword">export class</span> <span class="func">LoginPage</span> {
+  <span class="func">constructor</span>(<span class="keyword">private</span> page: Page) {}
+
+  <span class="keyword">async</span> <span class="func">open</span>() {
+    <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">goto</span>(env.baseUrl);
+    <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">screenshot</span>({ path: <span class="string">'screenshots/login.png'</span> });
+  }
+
+  <span class="keyword">async</span> <span class="func">enterCredentials</span>(username: <span class="keyword">string</span>, password: <span class="keyword">string</span>) {
+    <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">locator</span>(<span class="string">"input#signInFormUsername"</span>).<span class="func">fill</span>(username);
+    <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">locator</span>(<span class="string">"input#signInFormPassword"</span>).<span class="func">fill</span>(password);
+  }
+
+  <span class="keyword">async</span> <span class="func">clickSignIn</span>() {
+    <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">locator</span>(<span class="string">"input[aria-label='submit']"</span>).<span class="func">click</span>();
+  }
+}</pre>
+  <h3>Key Responsibilities</h3>
+  <ol>
+    <li><strong>Element location</strong> — Define and manage locators</li>
+    <li><strong>Atomic actions</strong> — Provide single-purpose methods (click, fill, verify)</li>
+    <li><strong>Wait strategies</strong> — Handle element visibility and loading states</li>
+    <li><strong>Screenshots</strong> — Capture visual evidence at key points</li>
+    <li><strong>Encapsulation</strong> — Hide implementation details</li>
+  </ol>
+  <h3>Best Practices</h3>
+  <ul>
+    <li><span class="check">✅</span> One class per page/component</li>
+    <li><span class="check">✅</span> Methods should be atomic (do one thing)</li>
+    <li><span class="check">✅</span> Return values for chaining or assertions</li>
+    <li><span class="check">✅</span> Use descriptive method names</li>
+    <li><span class="check">✅</span> Keep locators private</li>
+  </ul>
+</section>
+
+<!-- ARCHITECTURE FLOW -->
+<section id="flow">
+  <h2>6. Architecture Flow — Login Example</h2>
+  <p>Here's how a single Gherkin step flows through every layer:</p>
+
+  <h3>Layer 1 → Feature File <em>(What to test)</em></h3>
+  <pre><span class="keyword">Given</span> I login with username <span class="string">"admin"</span> and password <span class="string">"pass123"</span></pre>
+
+  <h3>Layer 2 → Step Definition <em>(Glue layer)</em></h3>
+  <pre><span class="func">Given</span>(<span class="string">"I login with username {string} and password {string}"</span>,
+  <span class="keyword">async function</span> (<span class="keyword">this</span>: PWWorld, user: <span class="keyword">string</span>, pass: <span class="keyword">string</span>) {
+    <span class="keyword">const</span> kw = <span class="keyword">new</span> <span class="func">LoginKeywords</span>(<span class="keyword">this</span>.page);
+    <span class="keyword">await</span> kw.<span class="func">login</span>(user, pass);
+  }
+);</pre>
+
+  <h3>Layer 3 → Keywords <em>(Business workflow)</em></h3>
+  <pre><span class="keyword">async</span> <span class="func">login</span>(username: <span class="keyword">string</span>, password: <span class="keyword">string</span>) {
+  <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">open</span>();
+  <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">enterCredentials</span>(username, password);
+  <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">clickSignIn</span>();
+  <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">selectOrganization</span>(env.organization);
+  <span class="keyword">await</span> <span class="keyword">this</span>.loginPage.<span class="func">clickLogin</span>();
+}</pre>
+
+  <h3>Layer 4 → Page Objects <em>(UI interactions)</em></h3>
+  <pre><span class="keyword">async</span> <span class="func">enterCredentials</span>(username: <span class="keyword">string</span>, password: <span class="keyword">string</span>) {
+  <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">locator</span>(<span class="string">"#username"</span>).<span class="func">fill</span>(username);
+  <span class="keyword">await</span> <span class="keyword">this</span>.page.<span class="func">locator</span>(<span class="string">"#password"</span>).<span class="func">fill</span>(password);
+}</pre>
+
+  <h3>Layer 5 → Playwright <em>(Browser automation)</em></h3>
+  <pre><span class="keyword">await</span> page.<span class="func">locator</span>(<span class="string">"#username"</span>).<span class="func">fill</span>(<span class="string">"admin"</span>);</pre>
+</section>
+
+<!-- BENEFITS -->
+<section id="benefits">
+  <h2>7. Benefits</h2>
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <h4>🔀 Separation of Concerns</h4>
+      <ul>
+        <li>Feature files → Business requirements</li>
+        <li>Step definitions → Test orchestration</li>
+        <li>Keywords → Business logic</li>
+        <li>Page objects → UI interactions</li>
+      </ul>
+    </div>
+    <div class="benefit-card">
+      <h4>🔧 Maintainability</h4>
+      <ul>
+        <li>UI changes → Update only Page Objects</li>
+        <li>Business logic changes → Update only Keywords</li>
+        <li>Test scenarios → Update only Feature files</li>
+        <li>No cascading changes across layers</li>
+      </ul>
+    </div>
+    <div class="benefit-card">
+      <h4>♻️ Reusability</h4>
+      <ul>
+        <li>Same step definitions across multiple scenarios</li>
+        <li>Same keywords for different test suites</li>
+        <li>Same page objects for different workflows</li>
+      </ul>
+    </div>
+    <div class="benefit-card">
+      <h4>📖 Readability</h4>
+      <ul>
+        <li>Non-technical stakeholders can read feature files</li>
+        <li>Developers understand clear layer separation</li>
+        <li>New team members onboard faster</li>
+      </ul>
+    </div>
+    <div class="benefit-card">
+      <h4>🧪 Testability</h4>
+      <ul>
+        <li>Each layer can be tested independently</li>
+        <li>Mock lower layers for unit testing</li>
+        <li>Integration testing at any layer</li>
+      </ul>
+    </div>
+    <div class="benefit-card">
+      <h4>📈 Scalability</h4>
+      <ul>
+        <li>Add new features without affecting existing code</li>
+        <li>Parallel test execution</li>
+        <li>Easy to extend with new pages/keywords</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK REFERENCE -->
+<section>
+  <h2>Quick Reference</h2>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Purpose</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Feature Files</strong></td><td>Define WHAT to test</td><td><code>Given I login with valid credentials</code></td></tr>
+      <tr><td><strong>Step Definitions</strong></td><td>Map Gherkin to code</td><td><code>Given("I login...", async function() {...})</code></td></tr>
+      <tr><td><strong>Keywords</strong></td><td>Implement business workflows</td><td><code>async login() { open(); enter(); click(); }</code></td></tr>
+      <tr><td><strong>Page Objects</strong></td><td>Interact with UI elements</td><td><code>async clickSignIn() { locator.click(); }</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- WHEN TO USE -->
+<section>
+  <h2>When to Use Each Layer</h2>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Use When</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Feature Files</strong></td><td>Defining new test scenarios, documenting business requirements, collaborating with non-technical stakeholders</td></tr>
+      <tr><td><strong>Step Definitions</strong></td><td>Mapping Gherkin steps to code, extracting parameters, accessing shared test context</td></tr>
+      <tr><td><strong>Keywords</strong></td><td>Implementing multi-step workflows, orchestrating multiple page interactions, adding business logic</td></tr>
+      <tr><td><strong>Page Objects</strong></td><td>Interacting with UI elements, defining element locators, implementing atomic page actions</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- SUMMARY -->
+<section>
+  <h2>Summary</h2>
+  <div class="summary-box">
+    <ul>
+      <li>Clear separation of concerns</li>
+      <li>High maintainability</li>
+      <li>Maximum reusability</li>
+      <li>Business-readable tests</li>
+      <li>Easy scalability</li>
+      <li>Type-safe implementation</li>
+    </ul>
+    <p style="margin-top:12px"><strong>Result:</strong> A robust, maintainable, and scalable test automation framework that bridges the gap between business requirements and technical implementation.</p>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
