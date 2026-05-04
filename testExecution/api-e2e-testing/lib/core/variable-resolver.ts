@@ -126,17 +126,17 @@ function generateTier2(baseUrl: string, resource: string): ResolvedVars {
     intIdentifierTypeIdentifier: '1000005',
     intIdentifierCodeSystemTypeIdentifier: '1',
 
-    // ── Contact search variables ──
-    strTypeDisplayName: 'Administrator',
-    intTypeIdentifier: '4200001',
+    // ── Contact search variables (must match SubEndpointHappy contact type) ──
+    strTypeDisplayName: 'Director/Manager',
+    intTypeIdentifier: '3100004',
     intTypeCodeSystemIdentifier: '1',
 
-    // ── Service Area search variables ──
-    strStateProvinceDisplayName: 'Alaska',
-    intStateProvinceIdentifier: '800002',
+    // ── Service Area search variables (must match SubEndpointHappy service-area) ──
+    strStateProvinceDisplayName: 'Missouri',
+    intStateProvinceIdentifier: '800027',
     intStateProvinceCodeSystemIdentifier: '1',
-    strCountyAreaDisplayName: 'Aleutians West Census Area',
-    intCountyAreaIdentifier: '900069',
+    strCountyAreaDisplayName: 'Barnes County',
+    intCountyAreaIdentifier: '901992',
     intCountyAreaCodeSystemIdentifier: '1',
 
     // ── Location search variables ──

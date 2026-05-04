@@ -156,6 +156,27 @@ export function clearSwaggerCache(): void {
   _parsedPaths = null;
 }
 
+// Static method overrides for sub-endpoints when Swagger is unavailable.
+// Maps URL tail patterns (after the entity key) to the correct HTTP method.
+const SUB_ENDPOINT_METHOD_OVERRIDES: Record<string, 'POST' | 'PUT'> = {
+  'contact': 'POST',
+  'service-area': 'POST',
+  'specialty': 'POST',
+  'location-type': 'POST',
+  'address': 'POST',
+};
+
+/** Look up static method override for a sub-endpoint URL (used when Swagger is unavailable). */
+export function getSubEndpointMethodOverride(urlPath: string): 'POST' | 'PUT' | null {
+  const clean = urlPath.replace(/https?:\/\/[^/]+/, '').replace(/\?.*$/, '');
+  const segments = clean.split('/').filter(Boolean);
+  const tail = segments[segments.length - 1];
+  if (tail && SUB_ENDPOINT_METHOD_OVERRIDES[tail.toLowerCase()]) {
+    return SUB_ENDPOINT_METHOD_OVERRIDES[tail.toLowerCase()];
+  }
+  return null;
+}
+
 /**
  * Look up the correct write method (POST or PUT) for a given URL path.
  * Used by sub-endpoint tests where the Excel has a RequestUrl but no method.
@@ -172,6 +193,14 @@ export function getWriteMethod(swagger: Record<string, any>, urlPath: string): '
       if (info.methods.includes('put')) return 'PUT';
     }
   }
+
+  // Static override: check URL tail after the GUID key segment
+  const segments = clean.split('/').filter(Boolean);
+  const tail = segments[segments.length - 1];
+  if (tail && SUB_ENDPOINT_METHOD_OVERRIDES[tail.toLowerCase()]) {
+    return SUB_ENDPOINT_METHOD_OVERRIDES[tail.toLowerCase()];
+  }
+
   return 'PUT'; // default fallback
 }
 

@@ -31,7 +31,7 @@ import {
 } from '../lib/core/excel-parser';
 import { VariableResolver, extractVariables } from '../lib/core/variable-resolver';
 import { resolveRoute, extractEntityKey, setSwaggerJson } from '../lib/core/route-resolver';
-import { fetchSwagger, getWriteMethod } from '../lib/core/swagger-client';
+import { fetchSwagger, getWriteMethod, getSubEndpointMethodOverride } from '../lib/core/swagger-client';
 import {
   validateStatus, validateUserMessage, validateRecordCount,
   assertStatus, assertUserMessage, assertRecordCount,
@@ -209,6 +209,12 @@ for (const pf of parsedFiles) {
       if (CFG.CONTEXT_LOC_KEY) resolver.setKey('strLocationKey', CFG.CONTEXT_LOC_KEY);
       if (CFG.CONTEXT_STAFF_KEY) resolver.setKey('strStaffMemberKey', CFG.CONTEXT_STAFF_KEY);
 
+      // Step G2: Alias keys for cross-entity references
+      const preAll = resolver.getAll();
+      if (preAll.strStaffMemberKey2 && !preAll.strRelatedStaffMemberKey) {
+        resolver.setKey('strRelatedStaffMemberKey', preAll.strStaffMemberKey2);
+      }
+
       // Step G: Scan all Excel cells for ${variable} refs → pre-resolve via SQL
       const allText = pf.suite.sheets.flatMap(s =>
         s.scenarios.flatMap(sc => [
@@ -313,6 +319,15 @@ for (const pf of parsedFiles) {
                   searchFieldsSnapshotted = true;
                   resolver.snapshotSearchFields();
                 }
+              }
+              // Re-snapshot after AddRemoveTest — business-profile updates may change
+              // the org's fullName/shortName, so search needs the latest values
+              if (sheet.sheetType === 'AddRemoveTest') {
+                resolver.snapshotSearchFields();
+              }
+              // Re-enrich org after AddRemoveTest removes data that search needs
+              if (sheet.sheetType === 'AddRemoveTest' && entityKey && i === scenarios.length - 1 && pf.entityName === 'Organization') {
+                await enrichOrgForSearch(api, resolver, pf.route, entityKey);
               }
               // Always keep the most complete POST body for comparison
               if (sheet.sheetType === 'CreateHappy' && (result as any)._postBody) {
@@ -732,7 +747,7 @@ async function runSubEndpointHappy(
 
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
   const url = resolver.resolveUrl(sc.requestUrl || '', route.resource);
-  const method = swagger ? getWriteMethod(swagger, url) : 'PUT';
+  const method = swagger ? getWriteMethod(swagger, url) : (getSubEndpointMethodOverride(url) || 'PUT');
 
   result.method = method;
   result.url = url;
@@ -758,7 +773,7 @@ async function runSubEndpointNegative(
 ) {
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
   const url = resolver.resolveUrl(sc.requestUrl || '', route.resource);
-  const method = swagger ? getWriteMethod(swagger, url) : 'PUT';
+  const method = swagger ? getWriteMethod(swagger, url) : (getSubEndpointMethodOverride(url) || 'PUT');
 
   result.method = method;
   result.url = url;
@@ -800,9 +815,9 @@ async function runSearch(
   if (sc.recordCount) {
     let countResult = validateRecordCount(resp.data, sc.recordCount);
     let finalData = resp.data;
-    // Retry twice with delays if count check fails (search indexing delay)
+    // Retry with delays if count check fails (search indexing delay)
     if (!countResult.passed && parseInt(sc.recordCount) > 0) {
-      for (const delay of [3000, 5000]) {
+      for (const delay of [3000, 5000, 8000, 12000, 15000]) {
         await new Promise(r => setTimeout(r, delay));
         const retry = await api.send('GET', url);
         if (retry.status === 200) {
@@ -852,10 +867,11 @@ async function runCombo(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
   sc: TestScenario, result: Partial<ScenarioResult>, swagger?: Record<string, any> | null,
 ) {
+  resolver.randomizeFields();
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
   const putUrl = resolver.resolveUrl(sc.putRequestUrl || '', route.resource);
   const getUrl = resolver.resolveUrl(sc.getRequestUrl || '', route.resource);
-  const writeMethod = swagger ? getWriteMethod(swagger, putUrl) : 'PUT';
+  const writeMethod = swagger ? getWriteMethod(swagger, putUrl) : (getSubEndpointMethodOverride(putUrl) || 'PUT');
 
   result.method = `${writeMethod}+GET`;
   result.url = `${writeMethod}:${putUrl} → GET:${getUrl}`;
@@ -881,9 +897,11 @@ async function runAddRemove(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
   sc: TestScenario, result: Partial<ScenarioResult>, swagger?: Record<string, any> | null,
 ) {
+  // Randomize fields so each add/remove pair uses unique data (avoids "already exists" on add)
+  resolver.randomizeFields();
   const body = resolver.resolveBody(sc.requestBody || '{}', route.resource);
   const putUrl = resolver.resolveUrl(sc.putRequestUrl || '', route.resource);
-  const writeMethod = swagger ? getWriteMethod(swagger, putUrl) : 'PUT';
+  const writeMethod = swagger ? getWriteMethod(swagger, putUrl) : (getSubEndpointMethodOverride(putUrl) || 'PUT');
 
   result.method = `${writeMethod}+REMOVE`;
   result.url = putUrl;
@@ -899,14 +917,15 @@ async function runAddRemove(
   // Build remove body: merge the add body with any key returned from the add response
   // so remove endpoints that require the child key (e.g. remove-phone) get it.
   // If the add response only returns the parent key, fetch the entity to find the child.
+  console.log(`  📞 Add response: ${JSON.stringify(putResp.data).slice(0, 300)}`);
+  console.log(`  📞 Add body: ${JSON.stringify(body).slice(0, 300)}`);
   const removeBody = await buildRemoveBody(api, body, putResp.data, putUrl);
-  if (removeBody !== body) {
-    console.log(`  🔗 Remove body built from add response: ${JSON.stringify(removeBody).slice(0, 200)}`);
-  }
+  console.log(`  📞 Remove body: ${JSON.stringify(removeBody).slice(0, 300)}`);
+  console.log(`  📞 Same as add? ${removeBody === body}`);
 
   if (sc.putRemoveRequestUrl) {
     const removeUrl = resolver.resolveUrl(sc.putRemoveRequestUrl, route.resource);
-    const removeMethod = swagger ? getWriteMethod(swagger, removeUrl) : 'PUT';
+    const removeMethod = swagger ? getWriteMethod(swagger, removeUrl) : (getSubEndpointMethodOverride(removeUrl) || 'PUT');
     const removeResp = await api.send(removeMethod, removeUrl, removeBody);
     if (removeResp.status !== (sc.putRemoveStatusCode || 200)) {
       console.log(`  ⚠ ${sc.scenario} ${removeMethod} remove → ${removeResp.status}: ${JSON.stringify(removeResp.data).slice(0, 300)}`);
@@ -934,6 +953,8 @@ async function runAddRemove(
 async function buildRemoveBody(api: ApiClient, addBody: any, addResponse: any, addUrl?: string): Promise<any> {
   if (!addResponse) return addBody;
   const model = addResponse.model ?? addResponse;
+  const urlTail = addUrl?.split('/').slice(-2).join('/') || '';
+  console.log(`  \u{1F50D} buildRemoveBody: model type=${typeof model}, value=${JSON.stringify(model).slice(0,80)}, addUrl=.../${urlTail}`);
 
   // If model is a full object with child key fields, merge them into addBody
   if (model && typeof model === 'object' && !Array.isArray(model)) {
@@ -964,7 +985,9 @@ async function fetchMatchingChild(
   api: ApiClient, parentKey: string, addBody: any, addUrl: string,
 ): Promise<any | null> {
   // Parse URL: .../organization/{key}/add-phone → entity=organization, child=phone
-  const segments = addUrl.replace(/\?.*/, '').split('/').filter(Boolean);
+  // Strip base URL (https://host) before parsing segments
+  const cleanUrl = addUrl.replace(/https?:\/\/[^/]+/, '').replace(/\?.*/, '');
+  const segments = cleanUrl.split('/').filter(Boolean);
   const lastSeg = segments[segments.length - 1]; // e.g. "add-phone"
   if (!lastSeg?.startsWith('add-')) return null;
 
@@ -989,14 +1012,34 @@ async function fetchMatchingChild(
     const items = entity[arrayName];
     if (!Array.isArray(items) || items.length === 0) return null;
 
-    // Find the item matching addBody by comparing shared fields
+    console.log(`  🔍 fetchMatchingChild: found ${items.length} ${arrayName}, addBody keys: ${Object.keys(addBody).join(',')}`);
+
+    // Find the item matching addBody by comparing shared fields (string + nested object)
+    const normalizePhone = (s: string) => s.replace(/[\s()\-]/g, '');
     const match = items.find((item: any) => {
       for (const [k, v] of Object.entries(addBody)) {
         if (k.toLowerCase().endsWith('key')) continue;
-        if (typeof v === 'string' && item[k] !== v) return false;
+        if (typeof v === 'string') {
+          if (k === 'number' || k.toLowerCase().includes('phone')) {
+            if (normalizePhone(v) !== normalizePhone(item[k] || '')) return false;
+          } else if (item[k] !== v) return false;
+        }
+        // For nested objects (e.g. phoneType), compare code/identifier
+        if (v && typeof v === 'object' && !Array.isArray(v) && item[k]) {
+          const vObj = v as Record<string, any>;
+          const iObj = item[k] as Record<string, any>;
+          if (vObj.code && iObj.code && String(vObj.code) !== String(iObj.code)) return false;
+          if (vObj.identifier && iObj.identifier && String(vObj.identifier) !== String(iObj.identifier)) return false;
+        }
       }
       return true;
     });
+
+    if (match) {
+      console.log(`  🔍 Exact match found in ${arrayName}`);
+    } else {
+      console.log(`  🔍 No exact match in ${arrayName}, using last item. Add number: "${addBody.number}", items[last].number: "${items[items.length-1]?.number}"`);
+    }
     // If no exact match, use the last item (most recently added)
     return match || items[items.length - 1];
   } catch {
@@ -1072,6 +1115,43 @@ function comparePostVsGet(postBody: any, getModel: any, entityName: string): Com
   }
 
   return results;
+}
+
+/**
+ * Re-add data to the org that AddRemoveTest removed but search needs.
+ */
+async function enrichOrgForSearch(
+  api: ApiClient, resolver: VariableResolver,
+  route: ReturnType<typeof resolveRoute>, orgKey: string,
+): Promise<void> {
+  const base = `${route.postRoute}/${orgKey}`;
+  const vars = resolver.getAll();
+  try {
+    await api.send('PUT', `${base}/add-address`, {
+      cityName: vars.strCity || vars.strCityName || 'TestCity',
+      firstStreetAddress: vars.strFirstStreetAddress || '123 Test St',
+      postalCode: vars.strPostalCode || '12345',
+      stateProvince: { codeSystemIdentifier: '1', name: 'Alabama', code: '800001' },
+      physicalAddressType: { codeSystemIdentifier: '1', name: 'Physical', code: '500003' },
+    });
+  } catch { /* ignore */ }
+  try {
+    await api.send('PUT', `${base}/add-identifier`, {
+      type: { codeSystemIdentifier: '1', name: 'NPI', code: '1000005' },
+      value: vars.strIdentifier || '9999999999',
+    });
+  } catch { /* ignore */ }
+  try {
+    await api.send('PUT', `${base}/business-profile`, {
+      businessProfile: {
+        fullName: vars.strFullName || vars.strName || 'AutoTest',
+        shortName: vars.strShortName || 'AT',
+        pointOfContactName: vars.strPointOfContactName || 'AutoPOC',
+      },
+    });
+  } catch { /* ignore */ }
+  resolver.snapshotSearchFields();
+  console.log(`   \\u{1F50D} Enriched org ${orgKey.slice(0, 8)}... for search`);
 }
 
 function csvEsc(val: any): string {
