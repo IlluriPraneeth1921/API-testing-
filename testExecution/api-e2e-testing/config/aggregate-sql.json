@@ -1,0 +1,26 @@
+{
+  "Organization": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 ProgramKey AS strProgramKey1 FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS P1, (SELECT TOP 1 ProgramKey AS strProgramKey2 FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS P2, (SELECT TOP 1 SystemRoleKey AS strSystemRoleKey1 FROM SecurityModule.SystemRole ORDER BY NEWID()) AS R1, (SELECT TOP 1 SystemRoleKey AS strSystemRoleKey2 FROM SecurityModule.SystemRole ORDER BY NEWID()) AS R2"
+  },
+  "Location": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 ProgramKey AS strProgramKey1 FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS P1, (SELECT TOP 1 ProgramKey AS strProgramKey2 FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS P2, (SELECT TOP 1 SystemRoleKey AS strSystemRoleKey1 FROM SecurityModule.SystemRole ORDER BY NEWID()) AS R1, (SELECT TOP 1 SystemRoleKey AS strSystemRoleKey2 FROM SecurityModule.SystemRole ORDER BY NEWID()) AS R2"
+  },
+  "StaffMember": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1"
+  },
+  "Person": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1, (SELECT TOP 1 StaffMemberKey AS strStaffMemberKey FROM OrganizationModule.StaffMember ORDER BY NEWID()) AS S1, (SELECT TOP 1 ProgramKey AS strProgramKey FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS P1"
+  },
+  "Case": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 PersonKey AS strPersonKey FROM PersonModule.Person ORDER BY NEWID()) AS P1, (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1, (SELECT TOP 1 StaffMemberKey AS strStaffMemberKey FROM OrganizationModule.StaffMember ORDER BY NEWID()) AS S1, (SELECT TOP 1 ProgramKey AS strProgramKey FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS PR1"
+  },
+  "Appointment": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 PersonKey AS strPersonKey FROM PersonModule.Person ORDER BY NEWID()) AS P1, (SELECT TOP 1 CaseKey AS strCaseKey FROM CaseModule.[Case] ORDER BY NEWID()) AS C1, (SELECT TOP 1 StaffMemberKey AS strStaffMemberKey FROM OrganizationModule.StaffMember ORDER BY NEWID()) AS S1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1, (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1"
+  },
+  "GeneralNote": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 PersonKey AS strPersonKey FROM PersonModule.Person ORDER BY NEWID()) AS P1, (SELECT TOP 1 CaseKey AS strCaseKey FROM CaseModule.[Case] ORDER BY NEWID()) AS C1, (SELECT TOP 1 StaffMemberKey AS strStaffMemberKey FROM OrganizationModule.StaffMember ORDER BY NEWID()) AS S1, (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1, (SELECT TOP 1 ProgramKey AS strProgramKey FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS PR1"
+  },
+  "_default": {
+    "query": "SELECT TOP 1 * FROM (SELECT TOP 1 OrganizationKey AS strOrganizationKey FROM OrganizationModule.Organization WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS O1, (SELECT TOP 1 LocationKey AS strLocationKey FROM OrganizationModule.Location WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS L1, (SELECT TOP 1 StaffMemberKey AS strStaffMemberKey FROM OrganizationModule.StaffMember ORDER BY NEWID()) AS S1, (SELECT TOP 1 PersonKey AS strPersonKey FROM PersonModule.Person ORDER BY NEWID()) AS P1, (SELECT TOP 1 CaseKey AS strCaseKey FROM CaseModule.[Case] ORDER BY NEWID()) AS C1, (SELECT TOP 1 ProgramKey AS strProgramKey FROM ProgramModule.Program WHERE StatusDisplayName = 'Active' ORDER BY NEWID()) AS PR1, (SELECT TOP 1 SystemRoleKey AS strSystemRoleKey FROM SecurityModule.SystemRole ORDER BY NEWID()) AS R1"
+  }
+}
