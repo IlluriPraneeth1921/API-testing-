@@ -229,6 +229,9 @@ for (const pf of parsedFiles) {
       if ((pf as any)._swagger) {
         await resolveMissingKeysViaSwagger(api, resolver, extractVariables(allText), (pf as any)._swagger);
       }
+
+      // Step I: Entity-specific key resolution
+      await resolver.resolveEntitySpecificKeys(pf.entityName);
     });
 
     // ── TEARDOWN: Write reports + cleanup after all tests ──
@@ -248,6 +251,7 @@ for (const pf of parsedFiles) {
     let lastPostBody: any = null;
     let lastPostKey: string | null = null;
     let searchFieldsSnapshotted = false;
+    let searchFieldsRefreshed = false;
 
     // Serial so CreateHappy runs first → entityKey shared to Update/Negative/Search
     test.describe.configure({ mode: 'serial' });
@@ -277,6 +281,45 @@ for (const pf of parsedFiles) {
           } else {
             console.log(`   ⚠ Fixture POST ${resp.status}: ${JSON.stringify(resp.data).slice(0, 200)}`);
           }
+        });
+      }
+
+      // Pre-search refresh: before first SearchValidation, GET the most complete org
+      // and contacts to override search fields with actual persisted data
+      if (sheet.sheetType === 'SearchValidation' && !searchFieldsRefreshed) {
+        searchFieldsRefreshed = true;
+        test(`[Search Prep] Refresh fields from GET ${pf.entityName}`, async () => {
+          // GET the most complete org for field values (city, identifier, POC)
+          const searchKey = lastPostKey || entityKey;
+          if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
+          const refreshResp = await api.send('GET', pf.route.getRoute.replace(/{[^}]+}/, searchKey));
+          if (refreshResp.status === 200) {
+            const model = refreshResp.data?.model ?? refreshResp.data;
+            if (model && typeof model === 'object') {
+              console.log(`   \ud83d\udd0d Org GET: bp.poc=${model.businessProfile?.pointOfContactName}, identifiers=${model.organizationIdentifiers?.length}, phones=${model.organizationPhones?.length}`);
+              overrideSearchFieldsFromGet(resolver, model, pf.entityName);
+            }
+          }
+          // GET contacts from entityKey (where SubEndpointHappy created them)
+          if (entityKey) {
+            const contactsResp = await api.send('GET', `${pf.route.postRoute}/${entityKey}/contacts?pageSize=5&paginationToken=0`);
+            console.log(`   \ud83d\udcde Contacts GET status=${contactsResp.status}, data=${JSON.stringify(contactsResp.data).slice(0, 500)}`);
+            if (contactsResp.status === 200) {
+              const items = contactsResp.data?.model || contactsResp.data?.model?.items || contactsResp.data?.items || [];
+              if (Array.isArray(items) && items.length > 0) {
+                const best = items.find((c: any) => c.typeDisplayName && c.phoneNumber) || items[0];
+                if (best.typeDisplayName) resolver.setKey('strTypeDisplayName', best.typeDisplayName);
+                if (best.typeIdentifier) resolver.setKey('intTypeIdentifier', best.typeIdentifier);
+                if (best.typeCodeSystemIdentifier) resolver.setKey('intTypeCodeSystemIdentifier', best.typeCodeSystemIdentifier);
+                if (best.phoneNumber) resolver.setKey('strPhoneNumber', best.phoneNumber);
+                console.log(`   \ud83d\udcde Contact prep: type=${best.typeDisplayName}, phone=${best.phoneNumber}`);
+              } else {
+                console.log(`   \ud83d\udcde No contact items found in response`);
+              }
+            }
+          }
+          resolver.snapshotSearchFields();
+          console.log(`   \ud83d\udd04 Search fields refreshed`);
         });
       }
 
@@ -313,16 +356,20 @@ for (const pf of parsedFiles) {
                 resolver.setKey(`str${pf.entityName}Key`, entityKey);
                 lastPostBody = (result as any)._postBody || null;
                 console.log(`   🔑 ${pf.entityName}Key = ${entityKey}`);
-                // P4: Snapshot the randomized fields used for this successful POST
-                // so search scenarios use matching values instead of later-randomized ones
                 if (!searchFieldsSnapshotted) {
                   searchFieldsSnapshotted = true;
                   resolver.snapshotSearchFields();
                 }
               }
-              // Re-snapshot after AddRemoveTest — business-profile updates may change
-              // the org's fullName/shortName, so search needs the latest values
-              if (sheet.sheetType === 'AddRemoveTest') {
+              // After each CreateHappy, GET the entity and override search fields
+              // so the snapshot always reflects the most complete persisted data
+              if (sheet.sheetType === 'CreateHappy' && result.entityKey) {
+                const vUrl = pf.route.getRoute.replace(/{[^}]+}/, result.entityKey!);
+                const vResp = await api.send('GET', vUrl);
+                if (vResp.status === 200) {
+                  const m = vResp.data?.model ?? vResp.data;
+                  if (m && typeof m === 'object') overrideSearchFieldsFromGet(resolver, m, pf.entityName);
+                }
                 resolver.snapshotSearchFields();
               }
               // Re-enrich org after AddRemoveTest removes data that search needs
@@ -685,6 +732,14 @@ async function runHappyPath(
   const resp = await api.send(method, url, body);
   result.actualStatus = resp.status;
 
+  // Log CreateHappy POST details for debugging
+  if (sheet.sheetType === 'CreateHappy') {
+    console.log(`  \u27a1\ufe0f ${method} ${url}`);
+    console.log(`    Body keys: ${Object.keys(body).join(', ')}`);
+    if (body.businessProfile) console.log(`    BP: ${JSON.stringify(body.businessProfile).slice(0, 150)}`);
+    console.log(`    Response: ${resp.status} key=${resp.data?.model || JSON.stringify(resp.data).slice(0, 100)}`);
+  }
+
   // Track status mismatch — don't assert so serial mode continues
   if (resp.status !== result.expectedStatus) {
     console.log(`  ⚠ ${sc.scenario}: expected ${result.expectedStatus}, got ${resp.status}: ${JSON.stringify(resp.data).slice(0, 400)}`);
@@ -756,6 +811,11 @@ async function runSubEndpointHappy(
   const resp = await api.send(method, url, body);
   result.actualStatus = resp.status;
 
+  // Log what was sent and received for debugging
+  console.log(`  \u27a1\ufe0f ${method} ${url}`);
+  console.log(`    Body: ${JSON.stringify(body).slice(0, 300)}`);
+  console.log(`    Response: ${resp.status} ${JSON.stringify(resp.data).slice(0, 200)}`);
+
   // Capture sub-endpoint key from response (e.g. locationTypeKey → strLocationTypeKey)
   if (resp.status >= 200 && resp.status < 300 && resp.data) {
     captureSubEndpointKeys(resp.data, url, resolver);
@@ -809,6 +869,13 @@ async function runSearch(
 
   const resp = await api.send('GET', url);
   result.actualStatus = resp.status;
+
+  // Log search request and response for debugging
+  console.log(`  \ud83d\udd0d SEARCH ${sc.scenario}: GET ${url.split('?')[1]?.slice(0, 100)}`);
+  if (sc.recordCount && parseInt(sc.recordCount) > 0) {
+    const items = resp.data?.model?.items || resp.data?.model || resp.data?.items || [];
+    console.log(`    Result: status=${resp.status}, count=${Array.isArray(items) ? items.length : resp.data?.model?.pagingData?.totalCount ?? '?'}`);
+  }
 
   assertStatus(resp.status, 200, sc.scenario);
 
@@ -1125,6 +1192,8 @@ async function enrichOrgForSearch(
   route: ReturnType<typeof resolveRoute>, orgKey: string,
 ): Promise<void> {
   const base = `${route.postRoute}/${orgKey}`;
+  // Restore snapshot so we use the CreateHappy values, not last-randomized
+  resolver.restoreSearchFields();
   const vars = resolver.getAll();
   try {
     await api.send('PUT', `${base}/add-address`, {
@@ -1150,11 +1219,68 @@ async function enrichOrgForSearch(
       },
     });
   } catch { /* ignore */ }
-  resolver.snapshotSearchFields();
-  console.log(`   \\u{1F50D} Enriched org ${orgKey.slice(0, 8)}... for search`);
+  // Re-create contact (inactivate/reactivate may have cleared them)
+  try {
+    const contactResp = await api.send('POST', `${base}/contact`, {
+      type: { codeSystemIdentifier: '1', name: 'Director/Manager', code: '3100004' },
+      title: vars.strTitle || 'Title',
+      name: vars.strName || 'AutoTest',
+      emailAddress: vars.strEmailAddress || vars.strEmail || 'auto@test.com',
+      isPrimary: true,
+      phone: {
+        number: vars.strPhoneNumber || '1 (555) 123-4567',
+        phoneType: { codeSystemIdentifier: '1', name: 'Home', code: '400003' },
+        isPrimary: true,
+      },
+    });
+    console.log(`   \ud83d\udcde Re-created contact: ${contactResp.status}`);
+  } catch { /* ignore */ }
+  console.log(`   \u{1F50D} Enriched org ${orgKey.slice(0, 8)}... for search`);
 }
 
 function csvEsc(val: any): string {
   const s = String(val ?? '');
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+
+/**
+ * Override search variables with actual persisted values from GET response.
+ */
+function overrideSearchFieldsFromGet(
+  resolver: VariableResolver, model: any, entityName: string,
+): void {
+  // BusinessProfile fields
+  if (model.businessProfile) {
+    const bp = model.businessProfile;
+    if (bp.fullName) resolver.setKey('strFullName', bp.fullName);
+    if (bp.shortName) resolver.setKey('strShortName', bp.shortName);
+    if (bp.pointOfContactName) resolver.setKey('strPointOfContactName', bp.pointOfContactName);
+  }
+  if (model.name) resolver.setKey('strName', model.name);
+
+  // City from first address
+  const addresses = model.organizationAddresses || model.locationAddresses || [];
+  if (Array.isArray(addresses) && addresses.length > 0) {
+    const city = addresses[0].cityName || addresses[0].city;
+    if (city) {
+      resolver.setKey('strCity', city);
+      resolver.setKey('strCityName', city);
+    }
+  }
+
+  // Identifier type from first identifier
+  const identifiers = model.organizationIdentifiers || model.locationIdentifiers || [];
+  if (Array.isArray(identifiers) && identifiers.length > 0) {
+    const idType = identifiers[0].type;
+    if (idType?.name) resolver.setKey('strIdentifierTypeDisplayName', idType.name);
+    if (idType?.code) resolver.setKey('intIdentifierTypeIdentifier', idType.code);
+    if (idType?.codeSystemIdentifier) resolver.setKey('intIdentifierCodeSystemTypeIdentifier', idType.codeSystemIdentifier);
+  }
+
+  // Phone from first phone
+  const phones = model.organizationPhones || model.locationPhones || [];
+  if (Array.isArray(phones) && phones.length > 0) {
+    if (phones[0].number) resolver.setKey('strPhoneNumber', phones[0].number);
+  }
 }

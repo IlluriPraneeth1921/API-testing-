@@ -244,6 +244,57 @@ export class VariableResolver {
     if (this.sqlClient) await this.sqlClient.close().catch(() => {});
   }
 
+  /** Resolve entity-specific keys that require custom SQL queries.
+   *  Creates its own SQL connection if the main one was skipped. */
+  async resolveEntitySpecificKeys(entityName: string): Promise<void> {
+    let client: any = this.sqlClient;
+    let ownConnection = false;
+    if (!client) {
+      try {
+        const { GenericSqlClient } = require('../generic-sql-client');
+        client = new GenericSqlClient(this.cfg);
+        await client.connect();
+        ownConnection = true;
+      } catch { return; }
+    }
+
+    if (entityName === 'Location') {
+      // Location-level role: CanGrantToStaffMemberLocationAssignment = 1
+      try {
+        const rows = await client.query(
+          `SELECT TOP 1 SystemRoleKey, Name FROM SecurityModule.SystemRole WHERE CanGrantToStaffMemberLocationAssignment = 1 ORDER BY EntityCreatedTimestamp DESC`, {}
+        );
+        if (rows.length > 0) {
+          this.cache['strSystemRoleKey'] = String(rows[0].SystemRoleKey);
+          this.cache['strSystemRoleKey1'] = String(rows[0].SystemRoleKey);
+          console.log(`  \u2713 Location-level role: ${rows[0].Name} = ${String(rows[0].SystemRoleKey).slice(0, 12)}... (SQL)`);
+        } else {
+          console.log(`  \u26a0 No location-level role found in SQL`);
+        }
+      } catch (e: any) {
+        console.log(`  \u26a0 Location role SQL failed: ${e.message}`);
+      }
+
+      // Service definition key
+      try {
+        const rows = await client.query(
+          `SELECT TOP 1 ServiceDefinitionKey FROM ServiceDefinitionModule.ServiceDefinition ORDER BY EntityCreatedTimestamp DESC`, {}
+        );
+        if (rows.length > 0) {
+          this.cache['strServiceDefinitionKey'] = String(rows[0].ServiceDefinitionKey);
+          this.cache['strServiceReferenceKey'] = String(rows[0].ServiceDefinitionKey);
+          console.log(`  \u2713 ServiceDefinitionKey = ${String(rows[0].ServiceDefinitionKey).slice(0, 12)}... (SQL)`);
+        } else {
+          console.log(`  \u26a0 No service definitions found in SQL`);
+        }
+      } catch (e: any) {
+        console.log(`  \u26a0 ServiceDefinition SQL failed: ${e.message}`);
+      }
+    }
+
+    if (ownConnection) await client.close().catch(() => {});
+  }
+
   /** Pre-resolve all Tier 1 SQL keys needed by this set of variables */
   async resolveNeededKeys(variableNames: Set<string>): Promise<void> {
     if (!this.sqlClient) return;
@@ -345,6 +396,8 @@ export class VariableResolver {
       'strPhoneNumber', 'strPhoneNumber1', 'strPhoneNumber2',
       'strFirstStreetAddress', 'strStreetName', 'strPostalCode',
       'intCredentialNumber', 'intCredentialNumber1', 'intCredentialNumber2',
+      'strIdentifierTypeDisplayName', 'intIdentifierTypeIdentifier', 'intIdentifierCodeSystemTypeIdentifier',
+      'strTypeDisplayName', 'intTypeIdentifier', 'intTypeCodeSystemIdentifier',
     ];
     this.searchSnapshot = {};
     for (const k of searchKeys) {
@@ -480,6 +533,19 @@ export class VariableResolver {
     resolved = resolved.replace(/pageSize=0&paginationToken=(\d+)/, 'pageSize=$1&paginationToken=0');
     // Fix leading & after ? (e.g. ?&pageSize=50 → ?pageSize=50)
     resolved = resolved.replace('?&', '?');
+    // Encode query param values that contain special chars (spaces, parens)
+    if (resolved.includes('?')) {
+      const [base, query] = resolved.split('?', 2);
+      const encoded = query.split('&').map(p => {
+        const eq = p.indexOf('=');
+        if (eq < 0) return p;
+        const key = p.slice(0, eq);
+        const val = p.slice(eq + 1);
+        if (/[\s()\[\]{}]/.test(val)) return `${key}=${encodeURIComponent(val)}`;
+        return p;
+      }).join('&');
+      resolved = `${base}?${encoded}`;
+    }
     return resolved;
   }
 }

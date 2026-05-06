@@ -765,3 +765,85 @@ TEMPLATE — Copy this block at the end of each session:
 - **Files created/modified**: none — analysis only
 - **Status**: done
 - **Next steps**: Optionally remove `deathDate` from Scenario1 in Excel to get clean 200; run full Person module to check other sheets (001_TC001, 001_TC002, 002_TC001, etc.); continue with other entity modules
+
+### Session — 2026-05-05
+- **What we worked on**:
+  - Ran full Note Module through `excel-driven-e2e.spec.ts` on DevF1 — all 11 note Excel files executed individually
+  - **Results summary**:
+    - GeneralNote: 51/76 (UpdateHappy/UpdateNegative → 403)
+    - CaseNote: 16/26 (ComboTest fails, search timeouts)
+    - ScratchpadNote: 0/25 (all 403 Forbidden)
+    - OrganizationNote: 20/22 ✅ (2 search timeouts)
+    - LocationNote: 20/22 ✅ (2 search timeouts)
+    - CrisisContactNote: 48/70 (Update → 403)
+    - CrisisResidentialNote: 28/52 (Update → 403)
+    - GuardianshipNote: 22/44 (missing `strGuardianshipKey` + Update 403)
+    - ProtectiveServicesReportNote: 28/57 (missing `strProtectiveServicesReportKey` + Update 403)
+    - ProviderExplorationAndDiscoveryNote: 0/63 ❌ (Cognito auth failure — incorrect username/password)
+    - TargetedCaseManagementNote: 1/63 (all 403 Forbidden)
+  - Also ran `npm run test:devf1:note-module` (note-module-e2e.spec.ts) — 6/7 note types passed, ProviderExplorationAndDiscoveryNote POST → 400
+  - **Common failure patterns identified**:
+    1. 403 "Authorization has been denied" on Update/some Create endpoints (user lacks write permissions)
+    2. Missing parent keys (GuardianshipKey, ProtectiveServicesReportKey) not resolved by aggregate key lookup
+    3. ProviderExplorationAndDiscoveryNote — Cognito auth failure (different credentials needed)
+    4. Search timeouts (~45s) on some queries returning 0 results
+  - Swagger 404 issue noted — user confirmed they know the cause (not a code fix needed)
+- **Files created/modified**: none — test execution only
+- **Status**: done (baseline run)
+- **Next steps**: Fix 403 auth issues (user context/permissions); add `strGuardianshipKey` and `strProtectiveServicesReportKey` to SQL_KEY_MAP or API resolver; fix ProviderExploration credentials; investigate ScratchpadNote/TCMNote blanket 403
+
+### Session — 2026-05-05
+- **What we worked on**:
+  - Ran full Note Module through `excel-driven-e2e.spec.ts` on DevF1 — all 11 note Excel files executed individually
+  - Added `MODULE` env var support to `resolveFiles()` — filters Excel files by entity name OR resolved API route path (from Swagger/route-resolver)
+  - Added module-level aggregate npm scripts: `test:devf1:note-all`, `test:devf1:org-all`, `test:devf1:person-all`, `test:devf1:case-all`, `test:devf1:guardianship-all`, `test:devf1:program-all`, `test:devf1:service-all`, `test:devf1:incident-all`, `test:devf1:psr-all`, `test:devf1:crisis-all`, `test:devf1:security-all`, `test:devf1:notification-all`, `test:devf1:attachment-all`, `test:devf1:health-all`, `test:devf1:pcp-all`, `test:devf1:rate-all`, `test:devf1:intake-all`, `test:devf1:region-all`, `test:devf1:file-all`, `test:devf1:task-all`, `test:devf1:waitlist-all`
+  - **Root cause analysis of search failures**:
+    - Discovered search was failing because `${strOrganizationKey}` resolved to a different org than what the API actually persisted (API overrides orgKey from user context cookie)
+    - Also discovered `${strTitle}` resolved to randomized value (`Title_abc123`) but Excel POST body had hardcoded title (`"Organization note title testing"`) — search looked for wrong value
+    - Confirmed via direct API calls: search with actual persisted orgKey → 25 results ✅, search with actual title → 191 results ✅
+  - **Fix: `overrideSearchFieldsFromGet()` function** — after CreateHappy POST + GET verification, extracts actual persisted field values from GET response and overrides resolver variables:
+    - Maps API fields → resolver vars: `title→strTitle`, `organizationKey→strOrganizationKey`, `message→strNote`, `name→strName`, `caseKey→strCaseKey`, etc.
+    - Also handles nested fields: `businessProfile.fullName`, `businessProfile.shortName`, `businessProfile.pointOfContactName`
+    - Snapshot is taken AFTER override, so search uses real persisted values
+  - **POST verification step** — after CreateHappy captures a key, immediately does GET-by-key to confirm entity was persisted. Logs `✅ POST verified` or `⚠ POST NOT persisted`
+  - **Result: OrganizationNote 20/22 → 22/22 (100%)** — Search S3 "Title" went from 45s timeout to 360ms pass, S4 "all params" from 45s to 277ms
+  - Ran Organization E2E: **153/161 (95.0%)** — same as before (8 remaining are unsupported API filter params)
+- **Files created/modified**:
+  - `testExecution/api-e2e-testing/tests/excel-driven-e2e.spec.ts` (MODULE filter in resolveFiles + POST verification + overrideSearchFieldsFromGet function)
+  - `testExecution/api-e2e-testing/package.json` (21 new module-level aggregate scripts)
+- **Status**: done
+- **Next steps**: Run `npm run test:devf1:note-all` to verify all 11 note types benefit from the search fix; run Organization to confirm no regression; check if the 8 remaining Org search failures can be fixed with the override approach (unlikely — those filters genuinely aren't supported by the API)
+
+### Session — 2026-05-06 (Organization SearchValidation deep investigation)
+- **What we worked on**:
+  - Spent 3 days investigating the remaining 7 SearchValidation failures (from 153/161 → 154/161)
+  - **Diagnostic logging added**: SubEndpointHappy POST body/response, CreateHappy body/response, Search Prep org GET fields, contacts GET raw response, runSearch query params + result counts
+  - **Fixes applied** (net +1 pass: city search now works):
+    - URL encoding for query params with spaces/parens (`encodeURIComponent` in `resolveUrl`)
+    - `overrideSearchFieldsFromGet` extracts city, identifier type, phone from org GET response
+    - `enrichOrgForSearch` calls `restoreSearchFields()` before re-adding data (uses snapshot values)
+    - Search Prep test added before SearchValidation (GETs org + contacts, overrides vars, snapshots)
+    - Contact re-creation in `enrichOrgForSearch` (inactivate/reactivate wipes contacts)
+    - Fixed contact data extraction — API returns flat fields (`typeDisplayName`, `phoneNumber`) not nested (`type.name`, `phone.number`)
+    - Removed AddRemoveTest re-snapshot (was overwriting Search Prep's snapshot)
+    - Added `strIdentifierTypeDisplayName`, `intTypeIdentifier`, etc. to snapshot key list
+  - **Root cause findings (confirmed via API responses)**:
+    1. **`pointOfContactName`** — API does NOT store/return this field (`bp.poc=undefined` in GET). The `business-profile` PUT accepts it but it's never persisted. Search filter cannot work.
+    2. **`identifierTypeDisplayName` / `identifierTypeIdentifier`** — Org has identifiers (count=2 in GET), but the `/organizations?identifierTypeDisplayName=...` search endpoint returns 0. API doesn't support these as search filter params.
+    3. **Contact `typeDisplayName` / `typeIdentifier` / `phone`** — Contact EXISTS (totalCount=1, `typeDisplayName=Director/Manager`, `phoneNumber=1-291-648-2792` confirmed in GET). But searching by these params returns 0. The contacts search API doesn't support filtering by type or phone.
+    4. **Contact Scenario 10** — combo of all filters including unsupported ones → returns 0
+  - **Evidence that these are API limitations (not data issues)**:
+    - Search Prep confirms data exists: `📞 Contact prep: type=Director/Manager, phone=1-291-648-2792`
+    - Org GET confirms identifiers exist: `identifiers=2, phones=2`
+    - Unfiltered contacts GET returns `totalCount:1` — data is there
+    - But filtered search returns 0 — API ignores/doesn't implement these filter params
+    - Negative tests (e.g. `typeDisplayName=Case` → 0) pass because 0 is expected — this doesn't prove the filter works, just that no data matches
+  - **Conclusion**: These 7 scenarios test API search filter capabilities that don't exist. The Excel test data assumes these filters are implemented, but the API doesn't support them. This is NOT a test framework bug.
+- **Files created/modified**:
+  - `testExecution/api-e2e-testing/tests/excel-driven-e2e.spec.ts` (Search Prep, enrichOrgForSearch, contact re-creation, diagnostic logging, overrideSearchFieldsFromGet function)
+  - `testExecution/api-e2e-testing/lib/core/variable-resolver.ts` (URL encoding, snapshot key list expansion)
+- **Final Organization E2E score: 154/161 (95.7%)**
+  - 7 remaining failures are confirmed unsupported API search filters
+  - All other test types: CreateHappy 4/4, CreateNegative 20/20, AddRemoveTest 17/17, SubEndpointNegative 66/66, SubEndpointHappy 4/4
+- **Status**: done — these 7 are API limitations, not fixable in test framework
+- **Next steps**: Report to dev team which search filters are not implemented (pointOfContactName, identifierTypeDisplayName, identifierTypeIdentifier, contact typeDisplayName, contact typeIdentifier, contact phone); optionally update Excel expected counts from 1→0 for these scenarios; move on to other entity modules
