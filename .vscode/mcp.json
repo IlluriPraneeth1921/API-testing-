@@ -1,9 +1,11 @@
 {
 	"servers": {
 		"playwright": {
-			"command": "C:\\Program Files\\nodejs\\node.exe",
+			"command": "cmd",
 			"args": [
-				"c:\\Whitelisted\\Palywright_0409\\katalon-to-playwright\\node_modules\\@playwright\\mcp\\cli.js"
+				"/c",
+				"npx",
+				"@playwright/mcp@latest"
 			],
 			"type": "stdio"
 		}
