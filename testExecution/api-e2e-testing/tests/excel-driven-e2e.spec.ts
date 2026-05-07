@@ -324,6 +324,7 @@ for (const pf of parsedFiles) {
     let resolver: VariableResolver;
     let report: E2EReportGenerator;
     let entityKey: string | null = null;
+    const successfulBodiesByResource = new Map<string, any>();
 
     const ts = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
     const outDir = path.join(__dirname, '..', 'output', `${pf.entityName}_E2E_${ts}`);
@@ -453,10 +454,14 @@ for (const pf of parsedFiles) {
           const searchKey = lastPostKey || entityKey;
           if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
           const searchSources: any[] = [];
-          if (lastPostBody) {
-            overrideSearchFieldsFromGet(resolver, lastPostBody, pf.entityName);
-            searchSources.push(lastPostBody);
-          }
+          const requestBodySources = applyTrackedRequestBodiesForSearch(
+            resolver,
+            pf.entityName,
+            searchBindings,
+            successfulBodiesByResource,
+            lastPostBody,
+          );
+          searchSources.push(...requestBodySources);
           if (pf.entityName === 'Organization') {
             await enrichOrgForSearch(api, resolver, pf.route, searchKey);
           }
@@ -544,6 +549,23 @@ for (const pf of parsedFiles) {
             } finally {
               result.durationMs = Date.now() - start;
               report.addResult(result as ScenarioResult);
+              const requestBody = (result as any)._requestBody;
+              const requestUrl = (result as any)._requestUrl;
+              if (
+                requestBody &&
+                requestUrl &&
+                typeof result.actualStatus === 'number' &&
+                result.actualStatus >= 200 &&
+                result.actualStatus < 300
+              ) {
+                trackSuccessfulRequestBody(
+                  successfulBodiesByResource,
+                  requestUrl,
+                  pf.route.postRoute,
+                  requestBody,
+                  sheet.sheetType,
+                );
+              }
 
               // Capture entity key from happy path
               if (sheet.sheetType === 'CreateHappy' && result.entityKey && !entityKey) {
@@ -932,6 +954,10 @@ async function runHappyPath(
 
   const resp = await api.send(method, url, body);
   result.actualStatus = resp.status;
+  if (resp.status >= 200 && resp.status < 300) {
+    (result as any)._requestBody = body;
+    (result as any)._requestUrl = url;
+  }
 
   // Log CreateHappy POST details for debugging
   if (sheet.sheetType === 'CreateHappy') {
@@ -982,6 +1008,10 @@ async function runNegative(
 
   const resp = await api.send(method, url, body);
   result.actualStatus = resp.status;
+  if (resp.status >= 200 && resp.status < 300) {
+    (result as any)._requestBody = body;
+    (result as any)._requestUrl = url;
+  }
 
   assertStatus(resp.status, result.expectedStatus, sc.scenario);
 
@@ -1148,6 +1178,10 @@ async function runCombo(
 
   const putResp = await api.send(writeMethod, putUrl, body);
   result.actualStatus = putResp.status;
+  if (putResp.status >= 200 && putResp.status < 300) {
+    (result as any)._requestBody = body;
+    (result as any)._requestUrl = putUrl;
+  }
   assertStatus(putResp.status, sc.putStatusCode || 200, `${sc.scenario} ${writeMethod}`);
 
   const getResp = await api.send('GET', getUrl);
@@ -1178,6 +1212,10 @@ async function runAddRemove(
 
   const putResp = await api.send(writeMethod, putUrl, body);
   result.actualStatus = putResp.status;
+  if (putResp.status >= 200 && putResp.status < 300) {
+    (result as any)._requestBody = body;
+    (result as any)._requestUrl = putUrl;
+  }
   if (putResp.status !== (sc.putStatusCode || 200)) {
     console.log(`  ⚠ ${sc.scenario} ${writeMethod} add → ${putResp.status}: ${JSON.stringify(putResp.data).slice(0, 300)}`);
   }
@@ -1564,6 +1602,166 @@ function applySearchBindingsFromSources(
 
   if (bindings.length > 0) {
     console.log(`   🔐 Dynamic search bindings resolved: ${resolvedCount}/${bindings.length}`);
+  }
+}
+
+function normalizeResourceFamily(value: string): string {
+  const clean = value.replace(/^\/+|\/+$/g, '');
+  const first = clean.split('/')[0].toLowerCase();
+  let normalized = first;
+
+  if (normalized.startsWith('add-')) normalized = normalized.slice(4);
+  else if (normalized.startsWith('remove-')) normalized = normalized.slice(7);
+
+  if (normalized.endsWith('ies') && normalized.length > 3) return `${normalized.slice(0, -3)}y`;
+  if (normalized.endsWith('sses') && normalized.length > 4) return normalized.slice(0, -2);
+  if (normalized.endsWith('s') && !normalized.endsWith('ss') && normalized.length > 1) return normalized.slice(0, -1);
+  return normalized;
+}
+
+function getSuccessfulBodyKey(
+  requestUrl: string,
+  basePostRoute: string,
+  sheetType: SheetType,
+): string {
+  const cleanUrl = requestUrl.replace(/https?:\/\/[^/]+/, '').replace(/\?.*/, '');
+  const cleanBase = basePostRoute.replace(/https?:\/\/[^/]+/, '').replace(/\?.*/, '');
+  if (cleanUrl === cleanBase) {
+    return sheetType === 'CreateHappy' ? 'entity:create' : 'entity:update';
+  }
+
+  const segments = cleanUrl.split('/').filter(Boolean);
+  const guidIdx = segments.findIndex(segment => GUID_RE.test(segment));
+  if (guidIdx < 0 || guidIdx === segments.length - 1) return 'entity:update';
+  return normalizeResourceFamily(segments[guidIdx + 1]);
+}
+
+function trackSuccessfulRequestBody(
+  store: Map<string, any>,
+  requestUrl: string,
+  basePostRoute: string,
+  body: any,
+  sheetType: SheetType,
+): void {
+  if (!body || typeof body !== 'object') return;
+  store.set(
+    getSuccessfulBodyKey(requestUrl, basePostRoute, sheetType),
+    JSON.parse(JSON.stringify(body)),
+  );
+}
+
+function resourceKeysForSearchBindings(bindings: SearchBinding[]): string[] {
+  const keys = new Set<string>(['entity:create']);
+  for (const binding of bindings) {
+    if (binding.childPath) {
+      keys.add(normalizeResourceFamily(binding.childPath));
+      continue;
+    }
+    const param = normalizeSearchToken(binding.paramName);
+    if (param.includes('pointofcontact') || param.includes('fullname') || param.includes('shortname')) keys.add('business-profile');
+    if (param.includes('city')) keys.add('address');
+    if (param.includes('identifier')) keys.add('identifier');
+    if (param.includes('specialty')) keys.add('specialty');
+    if (param.includes('primarytype') || param.includes('subtype') || param.includes('locationtypesubtype')) keys.add('location-type');
+    if (param.includes('stateprovince') || param.includes('countyarea')) keys.add('service-area');
+  }
+  return [...keys];
+}
+
+function applyTrackedRequestBodiesForSearch(
+  resolver: VariableResolver,
+  entityName: string,
+  bindings: SearchBinding[],
+  store: Map<string, any>,
+  lastPostBody: any,
+): any[] {
+  const appliedBodies: any[] = [];
+
+  if (lastPostBody) {
+    overrideSearchFieldsFromRequestBody(resolver, lastPostBody, entityName, 'entity:create');
+    appliedBodies.push(lastPostBody);
+  }
+
+  for (const key of resourceKeysForSearchBindings(bindings)) {
+    if (key === 'entity:create') continue;
+    const body = store.get(key);
+    if (!body) continue;
+    overrideSearchFieldsFromRequestBody(resolver, body, entityName, key);
+    appliedBodies.push(body);
+  }
+
+  return appliedBodies;
+}
+
+function overrideSearchFieldsFromRequestBody(
+  resolver: VariableResolver,
+  body: any,
+  entityName: string,
+  resourceKey: string,
+): void {
+  const key = normalizeResourceFamily(resourceKey);
+  if (!body || typeof body !== 'object') return;
+
+  switch (key) {
+    case 'entity:create':
+    case 'entity:update':
+      overrideSearchFieldsFromGet(resolver, body, entityName);
+      return;
+    case 'business-profile':
+      overrideSearchFieldsFromGet(resolver, { businessProfile: body.businessProfile || body }, entityName);
+      return;
+    case 'address':
+      overrideSearchFieldsFromGet(
+        resolver,
+        entityName === 'Organization'
+          ? { organizationAddresses: Array.isArray(body.organizationAddresses) ? body.organizationAddresses : [body] }
+          : { locationAddresses: Array.isArray(body.locationAddresses) ? body.locationAddresses : [body] },
+        entityName,
+      );
+      return;
+    case 'identifier':
+      overrideSearchFieldsFromGet(
+        resolver,
+        entityName === 'Organization'
+          ? { organizationIdentifiers: Array.isArray(body.organizationIdentifiers) ? body.organizationIdentifiers : [body] }
+          : { locationIdentifiers: Array.isArray(body.locationIdentifiers) ? body.locationIdentifiers : [body] },
+        entityName,
+      );
+      return;
+    case 'service-area':
+      overrideServiceAreaSearchFieldsFromGet(resolver, body);
+      return;
+    case 'location-type':
+      overrideSearchFieldsFromGet(
+        resolver,
+        {
+          locationPrimaryType: body.locationPrimaryType,
+          locationSubTypes: body.locationSubTypes || body.locationTypeSubtypes,
+        },
+        entityName,
+      );
+      return;
+    case 'specialty':
+      overrideSearchFieldsFromGet(
+        resolver,
+        { locationSpecialtyCode: body.locationSpecialtyCode || body.specialtyType || body },
+        entityName,
+      );
+      return;
+    case 'contact': {
+      const type = body.type || body.contactType;
+      const phone = body.phone || body.locationPhone || body.organizationPhone;
+      if (type?.name) resolver.setKey('strTypeDisplayName', String(type.name));
+      if (type?.code) resolver.setKey('intTypeIdentifier', String(type.code));
+      if (type?.codeSystemIdentifier) resolver.setKey('intTypeCodeSystemIdentifier', String(type.codeSystemIdentifier));
+      if (phone?.number) resolver.setKey('strPhoneNumber', String(phone.number));
+      if (body.name) resolver.setKey('strName', String(body.name));
+      if (body.emailAddress) resolver.setKey('strEmailAddress', String(body.emailAddress));
+      if (body.title) resolver.setKey('strTitle', String(body.title));
+      return;
+    }
+    default:
+      return;
   }
 }
 
