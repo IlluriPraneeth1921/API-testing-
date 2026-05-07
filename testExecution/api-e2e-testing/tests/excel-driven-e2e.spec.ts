@@ -207,6 +207,39 @@ function collectSearchVariables(suite: TestSuite): string[] {
   return [...extractVariables(searchTexts)].sort();
 }
 
+interface SearchBinding {
+  paramName: string;
+  variableName: string;
+  childPath: string | null;
+}
+
+function extractSearchBindings(sheet: TestSheet): SearchBinding[] {
+  const bindings: SearchBinding[] = [];
+
+  for (const scenario of sheet.scenarios) {
+    const requestUrl = scenario.requestUrl || '';
+    if (!requestUrl || !requestUrl.includes('?')) continue;
+
+    const childPath = extractSearchChildPath(requestUrl);
+    const query = requestUrl.split('?', 2)[1].replace(/^&/, '');
+    for (const pair of query.split('&')) {
+      if (!pair) continue;
+      const [paramName, rawValue = ''] = pair.split('=', 2);
+      const match = rawValue.match(/^\$\{(\w+)\}$/);
+      if (!paramName || !match) continue;
+      bindings.push({ paramName, variableName: match[1], childPath });
+    }
+  }
+
+  return bindings;
+}
+
+function extractSearchChildPath(requestUrl: string): string | null {
+  const pathPart = requestUrl.split('?', 2)[0];
+  const match = pathPart.match(/\$\{str\w+Key\}\/(.+)$/);
+  return match ? match[1].replace(/^\/+|\/+$/g, '') : null;
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // BLOCK 4: PARSE EXCEL FILES — Read all matched Excel files at load time
 //   - Extracts TFS ID + entity name from filename (e.g. 728300_Organization)
@@ -415,9 +448,11 @@ for (const pf of parsedFiles) {
       // persisted entity and child resources to refresh search filters.
       if (sheet.sheetType === 'SearchValidation') {
         test(`[Search Prep] Refresh fields from GET ${pf.entityName} :: ${sheet.sheetName}`, async () => {
+          const searchBindings = extractSearchBindings(sheet);
           // GET the most complete org for field values (city, identifier, POC)
           const searchKey = lastPostKey || entityKey;
           if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
+          const searchSources: any[] = [];
           if (pf.entityName === 'Organization') {
             await enrichOrgForSearch(api, resolver, pf.route, searchKey);
           }
@@ -427,6 +462,7 @@ for (const pf of parsedFiles) {
             if (model && typeof model === 'object') {
               console.log(`   \ud83d\udd0d Org GET: bp.poc=${model.businessProfile?.pointOfContactName}, identifiers=${model.organizationIdentifiers?.length}, phones=${model.organizationPhones?.length}`);
               overrideSearchFieldsFromGet(resolver, model, pf.entityName);
+              searchSources.push(model);
             }
           }
           // GET contacts from entityKey (where SubEndpointHappy created them)
@@ -457,6 +493,15 @@ for (const pf of parsedFiles) {
               }
             }
           }
+          const childPaths = [...new Set(searchBindings.map(binding => binding.childPath).filter(Boolean))] as string[];
+          for (const childPath of childPaths) {
+            const childResp = await api.send('GET', `${pf.route.postRoute}/${searchKey}/${childPath}?pageSize=5&paginationToken=0`);
+            console.log(`   \ud83d\udd0e Child GET ${childPath} status=${childResp.status}, data=${JSON.stringify(childResp.data).slice(0, 300)}`);
+            if (childResp.status !== 200) continue;
+            const childData = childResp.data?.model?.items || childResp.data?.items || childResp.data?.model || childResp.data;
+            if (childData) searchSources.push(childData);
+          }
+          applySearchBindingsFromSources(resolver, searchBindings, searchSources);
           resolver.snapshotSearchFields(pf.searchVariables);
           console.log(`   \ud83d\udd04 Search fields refreshed`);
         });
@@ -1382,6 +1427,123 @@ async function enrichOrgForSearch(
 function csvEsc(val: any): string {
   const s = String(val ?? '');
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function normalizeSearchToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function singularizeSearchWord(word: string): string {
+  if (word.endsWith('ies') && word.length > 3) return `${word.slice(0, -3)}y`;
+  if (word.endsWith('sses') && word.length > 4) return word.slice(0, -2);
+  if (word.endsWith('s') && !word.endsWith('ss') && word.length > 1) return word.slice(0, -1);
+  return word;
+}
+
+function wordsFromSearchSegment(segment: string): string[] {
+  const clean = segment
+    .replace(/\[\d+\]/g, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  return clean
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(word => singularizeSearchWord(word.toLowerCase()));
+}
+
+function segmentVariants(segment: string): string[] {
+  const words = wordsFromSearchSegment(segment);
+  const variants = new Set<string>();
+
+  for (let i = 0; i < words.length; i++) {
+    variants.add(words.slice(i).join(''));
+  }
+  if (words.length > 1 && words[words.length - 1] === 'name') {
+    variants.add(words.slice(0, -1).join(''));
+  }
+  if (words.length > 1 && words[words.length - 1] === 'code') {
+    variants.add(words.slice(0, -1).join(''));
+    variants.add(`${words.slice(0, -1).join('')}type`);
+  }
+
+  return [...variants].filter(Boolean);
+}
+
+function pathAliasCandidates(pathSegments: string[]): string[] {
+  const lists = pathSegments.map(segmentVariants).filter(list => list.length > 0);
+  const aliases = new Set<string>();
+
+  const build = (segments: string[][], idx: number, parts: string[]) => {
+    if (idx === segments.length) {
+      aliases.add(parts.join(''));
+      return;
+    }
+    for (const variant of segments[idx]) {
+      build(segments, idx + 1, [...parts, variant]);
+    }
+  };
+
+  for (let start = 0; start < lists.length; start++) {
+    build(lists.slice(start), 0, []);
+  }
+
+  return [...aliases].filter(Boolean);
+}
+
+function addSearchIndexValue(index: Map<string, string>, alias: string, value: any): void {
+  if (value === undefined || value === null || value === '') return;
+  const key = normalizeSearchToken(alias);
+  if (!key || index.has(key)) return;
+  index.set(key, String(value));
+}
+
+function walkSearchSource(node: any, pathSegments: string[], index: Map<string, string>): void {
+  if (node === undefined || node === null) return;
+
+  if (Array.isArray(node)) {
+    for (const item of node) walkSearchSource(item, pathSegments, index);
+    return;
+  }
+
+  if (typeof node !== 'object') {
+    for (const alias of pathAliasCandidates(pathSegments)) {
+      addSearchIndexValue(index, alias, node);
+    }
+    return;
+  }
+
+  if (pathSegments.length > 0 && ('name' in node || 'code' in node || 'codeSystemIdentifier' in node)) {
+    for (const alias of pathAliasCandidates(pathSegments)) {
+      addSearchIndexValue(index, `${alias}DisplayName`, node.name);
+      addSearchIndexValue(index, `${alias}Identifier`, node.code);
+      addSearchIndexValue(index, `${alias}CodeSystemIdentifier`, node.codeSystemIdentifier);
+    }
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    walkSearchSource(value, [...pathSegments, key], index);
+  }
+}
+
+function applySearchBindingsFromSources(
+  resolver: VariableResolver, bindings: SearchBinding[], sources: any[],
+): void {
+  const index = new Map<string, string>();
+  for (const source of sources) {
+    walkSearchSource(source, [], index);
+  }
+
+  let resolvedCount = 0;
+  for (const binding of bindings) {
+    const value = index.get(normalizeSearchToken(binding.paramName));
+    if (!value) continue;
+    resolver.setKey(binding.variableName, value);
+    resolvedCount++;
+  }
+
+  if (bindings.length > 0) {
+    console.log(`   🔐 Dynamic search bindings resolved: ${resolvedCount}/${bindings.length}`);
+  }
 }
 
 
