@@ -48,13 +48,118 @@ const { name: ENV_NAME, config: CFG } = loadEnvConfig();  // reads env_config.js
 const SKIP_SQL = process.env.SKIP_SQL === 'true';          // skip SQL verification
 const MAX_SCENARIOS = process.env.MAX_SCENARIOS ? parseInt(process.env.MAX_SCENARIOS) : undefined; // limit scenarios per sheet
 const TEST_TYPE = process.env.TEST_TYPE;                   // filter: happy|negative|search|error|combo
+const MODULE_FILTER = process.env.MODULE;                  // filter by module name/segment
+const AGGREGATE_FILTER = process.env.AGGREGATE;            // filter by entity/aggregate name
 
 // ══════════════════════════════════════════════════════════════════════
 // BLOCK 2: FILE RESOLUTION — Decide which Excel files to run
 //   - EXCEL env var → run single file
 //   - TFS env var   → find by TFS ID prefix
+//   - MODULE env var → run files whose module matches
+//   - AGGREGATE env var → run files whose aggregate/entity matches
 //   - Neither       → run ALL Excel files in API-TestData/
 // ══════════════════════════════════════════════════════════════════════
+
+function splitFilterValues(raw?: string): string[] {
+  return (raw || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+function normalizeFilterValue(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function toFilterTokens(value: string): string[] {
+  const normalized = normalizeFilterValue(value);
+  if (!normalized) return [];
+  const withoutModuleSuffix = normalized.replace(/module$/, '');
+  return [...new Set([normalized, withoutModuleSuffix].filter(Boolean))];
+}
+
+function getModuleSegment(postRoute: string): string {
+  const segments = postRoute.split('/').filter(Boolean);
+  return segments[2] || '';
+}
+
+function getEntityWords(entityName: string): string[] {
+  return entityName
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+interface FileSelectionMeta {
+  entityName: string;
+  moduleTokens: string[];
+  aggregateTokens: string[];
+}
+
+const fileSelectionMetaCache = new Map<string, FileSelectionMeta>();
+
+function getFileSelectionMeta(file: string): FileSelectionMeta {
+  const cached = fileSelectionMetaCache.get(file);
+  if (cached) return cached;
+
+  const { entityName } = parseFilename(file);
+  const route = resolveRoute(entityName);
+  const moduleSegment = getModuleSegment(route.postRoute);
+  const entityWords = getEntityWords(entityName);
+
+  const moduleTokens = new Set<string>([
+    normalizeFilterValue(moduleSegment),
+    normalizeFilterValue(moduleSegment).replace(/module$/, ''),
+  ]);
+
+  const aggregateTokens = new Set<string>([
+    ...toFilterTokens(entityName),
+    ...entityWords.flatMap(toFilterTokens),
+  ]);
+
+  const meta = {
+    entityName,
+    moduleTokens: [...moduleTokens],
+    aggregateTokens: [...aggregateTokens],
+  };
+  fileSelectionMetaCache.set(file, meta);
+  return meta;
+}
+
+function matchesModuleFilter(file: string, rawFilter: string | undefined): boolean {
+  const filters = splitFilterValues(rawFilter);
+  if (filters.length === 0) return true;
+
+  const meta = getFileSelectionMeta(file);
+  return filters.some(filterValue => {
+    const normalizedFilter = normalizeFilterValue(filterValue);
+    if (!normalizedFilter) return false;
+
+    if (normalizedFilter.endsWith('module')) {
+      return meta.moduleTokens[0] === normalizedFilter;
+    }
+
+    return meta.moduleTokens.some(candidate => candidate.includes(normalizedFilter));
+  });
+}
+
+function matchesAggregateFilter(file: string, rawFilter: string | undefined): boolean {
+  const filters = splitFilterValues(rawFilter);
+  if (filters.length === 0) return true;
+
+  const meta = getFileSelectionMeta(file);
+  return filters.some(filterValue => {
+    const filterTokens = toFilterTokens(filterValue);
+    return filterTokens.some(filterToken =>
+      meta.aggregateTokens.some(candidate =>
+        candidate === filterToken ||
+        candidate.includes(filterToken) ||
+        filterToken.includes(candidate)
+      )
+    );
+  });
+}
 
 function resolveFiles(): string[] {
   const all = listExcelFiles();
@@ -66,7 +171,10 @@ function resolveFiles(): string[] {
     const f = all.find(f => f.startsWith(process.env.TFS! + '_'));
     return f ? [f] : [];
   }
-  return all;
+
+  return all
+    .filter(file => matchesModuleFilter(file, MODULE_FILTER))
+    .filter(file => matchesAggregateFilter(file, AGGREGATE_FILTER));
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -100,6 +208,12 @@ function shouldRunType(sheetType: SheetType): boolean {
 // ══════════════════════════════════════════════════════════════════════
 
 const files = resolveFiles();
+if (MODULE_FILTER || AGGREGATE_FILTER) {
+  console.log(
+    `[excel-driven-e2e] Selected ${files.length} Excel file(s) ` +
+    `(MODULE=${MODULE_FILTER || '-'} AGGREGATE=${AGGREGATE_FILTER || '-'})`
+  );
+}
 
 interface ParsedFile {
   file: string;
@@ -151,7 +265,10 @@ for (const file of files) {
 
 if (parsedFiles.length === 0) {
   test('No Excel files matched', () => {
-    console.log(`No files matched. EXCEL=${process.env.EXCEL} TFS=${process.env.TFS}`);
+    console.log(
+      `No files matched. EXCEL=${process.env.EXCEL} TFS=${process.env.TFS} ` +
+      `MODULE=${MODULE_FILTER} AGGREGATE=${AGGREGATE_FILTER}`
+    );
     test.skip();
   });
 }
