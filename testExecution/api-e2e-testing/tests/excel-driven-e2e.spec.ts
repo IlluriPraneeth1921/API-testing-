@@ -1430,7 +1430,7 @@ function csvEsc(val: any): string {
 }
 
 function normalizeSearchToken(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return wordsFromSearchSegment(value).join('');
 }
 
 function singularizeSearchWord(word: string): string {
@@ -1464,6 +1464,11 @@ function segmentVariants(segment: string): string[] {
   if (words.length > 1 && words[words.length - 1] === 'code') {
     variants.add(words.slice(0, -1).join(''));
     variants.add(`${words.slice(0, -1).join('')}type`);
+    variants.add(words.slice(1, -1).join(''));
+    variants.add(`${words.slice(1, -1).join('')}type`);
+  }
+  if (words.length >= 3 && words[0] === 'location' && words[1] === 'sub' && words[2] === 'type') {
+    variants.add('locationtypesubtype');
   }
 
   return [...variants].filter(Boolean);
@@ -1647,8 +1652,11 @@ function overrideServiceAreaSearchFieldsFromGet(
 
   const state = serviceArea.stateProvince;
   if (state) {
+    if (state.name) resolver.setKey('strStateDisplayName', state.name);
     if (state.name) resolver.setKey('strStateProvinceDisplayName', state.name);
+    if (state.code) resolver.setKey('strStateIdentifier', state.code);
     if (state.code) resolver.setKey('intStateProvinceIdentifier', state.code);
+    if (state.codeSystemIdentifier) resolver.setKey('strStateCodeSystemIdentifier', state.codeSystemIdentifier);
     if (state.codeSystemIdentifier) resolver.setKey('intStateProvinceCodeSystemIdentifier', state.codeSystemIdentifier);
   }
 
