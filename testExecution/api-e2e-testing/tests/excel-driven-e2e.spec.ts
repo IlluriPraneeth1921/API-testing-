@@ -494,14 +494,16 @@ for (const pf of parsedFiles) {
             }
           }
           const childPaths = [...new Set(searchBindings.map(binding => binding.childPath).filter(Boolean))] as string[];
-          for (const childPath of childPaths) {
-            const childResp = await api.send('GET', `${pf.route.postRoute}/${searchKey}/${childPath}?pageSize=5&paginationToken=0`);
-            console.log(`   \ud83d\udd0e Child GET ${childPath} status=${childResp.status}, data=${JSON.stringify(childResp.data).slice(0, 300)}`);
-            if (childResp.status !== 200) continue;
-            const childData = childResp.data?.model?.items || childResp.data?.items || childResp.data?.model || childResp.data;
-            if (childData) searchSources.push(childData);
+          if (childPaths.length > 0) {
+            for (const childPath of childPaths) {
+              const childResp = await api.send('GET', `${pf.route.postRoute}/${searchKey}/${childPath}?pageSize=5&paginationToken=0`);
+              console.log(`   \ud83d\udd0e Child GET ${childPath} status=${childResp.status}, data=${JSON.stringify(childResp.data).slice(0, 300)}`);
+              if (childResp.status !== 200) continue;
+              const childData = childResp.data?.model?.items || childResp.data?.items || childResp.data?.model || childResp.data;
+              if (childData) searchSources.push(childData);
+            }
+            applySearchBindingsFromSources(resolver, searchBindings, searchSources);
           }
-          applySearchBindingsFromSources(resolver, searchBindings, searchSources);
           resolver.snapshotSearchFields(pf.searchVariables);
           console.log(`   \ud83d\udd04 Search fields refreshed`);
         });
