@@ -379,7 +379,6 @@ for (const pf of parsedFiles) {
     let lastPostBody: any = null;
     let lastPostKey: string | null = null;
     let searchFieldsSnapshotted = false;
-    let searchFieldsRefreshed = false;
 
     // Serial so CreateHappy runs first → entityKey shared to Update/Negative/Search
     test.describe.configure({ mode: 'serial' });
@@ -412,14 +411,16 @@ for (const pf of parsedFiles) {
         });
       }
 
-      // Pre-search refresh: before first SearchValidation, GET the most complete org
-      // and contacts to override search fields with actual persisted data
-      if (sheet.sheetType === 'SearchValidation' && !searchFieldsRefreshed) {
-        searchFieldsRefreshed = true;
+      // Pre-search refresh: before each SearchValidation sheet, GET the latest
+      // persisted entity and child resources to refresh search filters.
+      if (sheet.sheetType === 'SearchValidation') {
         test(`[Search Prep] Refresh fields from GET ${pf.entityName}`, async () => {
           // GET the most complete org for field values (city, identifier, POC)
           const searchKey = lastPostKey || entityKey;
           if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
+          if (pf.entityName === 'Organization') {
+            await enrichOrgForSearch(api, resolver, pf.route, searchKey);
+          }
           const refreshResp = await api.send('GET', pf.route.getRoute.replace(/{[^}]+}/, searchKey));
           if (refreshResp.status === 200) {
             const model = refreshResp.data?.model ?? refreshResp.data;
@@ -443,6 +444,16 @@ for (const pf of parsedFiles) {
                 console.log(`   \ud83d\udcde Contact prep: type=${best.typeDisplayName}, phone=${best.phoneNumber}`);
               } else {
                 console.log(`   \ud83d\udcde No contact items found in response`);
+              }
+            }
+          }
+          if (entityKey && pf.entityName === 'Organization') {
+            const serviceAreasResp = await api.send('GET', `${pf.route.postRoute}/${entityKey}/service-areas?pageSize=5&paginationToken=0`);
+            console.log(`   \ud83d\uddfa\ufe0f Service areas GET status=${serviceAreasResp.status}, data=${JSON.stringify(serviceAreasResp.data).slice(0, 500)}`);
+            if (serviceAreasResp.status === 200) {
+              const items = serviceAreasResp.data?.model?.items || serviceAreasResp.data?.items || serviceAreasResp.data?.model || [];
+              if (Array.isArray(items) && items.length > 0) {
+                overrideServiceAreaSearchFieldsFromGet(resolver, items[0]);
               }
             }
           }
@@ -1406,11 +1417,85 @@ function overrideSearchFieldsFromGet(
     if (idType?.name) resolver.setKey('strIdentifierTypeDisplayName', idType.name);
     if (idType?.code) resolver.setKey('intIdentifierTypeIdentifier', idType.code);
     if (idType?.codeSystemIdentifier) resolver.setKey('intIdentifierCodeSystemTypeIdentifier', idType.codeSystemIdentifier);
+    if (idType?.name) resolver.setKey('strbusinessIdentifierDisplayName', idType.name);
+    if (idType?.code) resolver.setKey('strbusinessIdentifierIdentifier', idType.code);
+    if (idType?.codeSystemIdentifier) resolver.setKey('strbusinessIdentifierCodeSystemIdentifier', idType.codeSystemIdentifier);
   }
 
   // Phone from first phone
   const phones = model.organizationPhones || model.locationPhones || [];
   if (Array.isArray(phones) && phones.length > 0) {
     if (phones[0].number) resolver.setKey('strPhoneNumber', phones[0].number);
+  }
+
+  const status = model.status || model.externalStatus;
+  if (status) {
+    if (status.name) {
+      resolver.setKey('strStatusDisplayName', status.name);
+      resolver.setKey('strstatusDisplayName', status.name);
+      resolver.setKey('strLocationStatusDisplayName', status.name);
+    }
+    if (status.code) {
+      resolver.setKey('intStatusIdentifier', status.code);
+      resolver.setKey('strstatusIdentifier', status.code);
+      resolver.setKey('intLocationStatusIdentifier', status.code);
+    }
+    if (status.codeSystemIdentifier) {
+      resolver.setKey('intStatusCodeSystemIdentifier', status.codeSystemIdentifier);
+      resolver.setKey('strstatusCodeSystemIdentifier', status.codeSystemIdentifier);
+      resolver.setKey('intLocationStatusCodeSystemIdentifier', status.codeSystemIdentifier);
+    }
+  }
+
+  const primaryType = model.locationPrimaryType || model.primaryType;
+  if (primaryType) {
+    if (primaryType.name) resolver.setKey('strprimaryTypeDisplayName', primaryType.name);
+    if (primaryType.code) resolver.setKey('strprimaryTypeIdentifier', primaryType.code);
+    if (primaryType.codeSystemIdentifier) resolver.setKey('strprimaryTypeCodeSystemIdentifier', primaryType.codeSystemIdentifier);
+  }
+
+  const subTypes = model.locationSubTypes || model.locationTypeSubtypes || [];
+  if (Array.isArray(subTypes) && subTypes.length > 0) {
+    const subType = subTypes[0];
+    if (subType?.name) resolver.setKey('strsubTypeDisplayName', subType.name);
+    if (subType?.code) resolver.setKey('strsubTypeIdentifier', subType.code);
+    if (subType?.codeSystemIdentifier) resolver.setKey('strsubTypeCodeSystemIdentifier', subType.codeSystemIdentifier);
+  }
+
+  const specialty =
+    model.locationSpecialtyCode ||
+    model.locationSpecialties?.[0]?.locationSpecialtyCode ||
+    model.locationSpecialties?.[0]?.specialtyType ||
+    model.locationSpecialties?.[0];
+  if (specialty) {
+    if (specialty.name) resolver.setKey('strspecialtyTypeDisplayName', specialty.name);
+    if (specialty.code) resolver.setKey('strspecialtyTypeIdentifier', specialty.code);
+    if (specialty.codeSystemIdentifier) resolver.setKey('strspecialtyTypeCodeSystemIdentifier', specialty.codeSystemIdentifier);
+  }
+
+  if (entityName === 'Organization' && model.serviceAreas?.length) {
+    overrideServiceAreaSearchFieldsFromGet(resolver, model.serviceAreas[0]);
+  }
+}
+
+function overrideServiceAreaSearchFieldsFromGet(
+  resolver: VariableResolver, serviceArea: any,
+): void {
+  if (!serviceArea || typeof serviceArea !== 'object') return;
+
+  const state = serviceArea.stateProvince;
+  if (state) {
+    if (state.name) resolver.setKey('strStateProvinceDisplayName', state.name);
+    if (state.code) resolver.setKey('intStateProvinceIdentifier', state.code);
+    if (state.codeSystemIdentifier) resolver.setKey('intStateProvinceCodeSystemIdentifier', state.codeSystemIdentifier);
+  }
+
+  const county = Array.isArray(serviceArea.countyAreas) && serviceArea.countyAreas.length > 0
+    ? serviceArea.countyAreas[0]
+    : null;
+  if (county) {
+    if (county.name) resolver.setKey('strCountyAreaDisplayName', county.name);
+    if (county.code) resolver.setKey('intCountyAreaIdentifier', county.code);
+    if (county.codeSystemIdentifier) resolver.setKey('intCountyAreaCodeSystemIdentifier', county.codeSystemIdentifier);
   }
 }
