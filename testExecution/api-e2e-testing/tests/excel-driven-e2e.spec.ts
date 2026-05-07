@@ -414,7 +414,7 @@ for (const pf of parsedFiles) {
       // Pre-search refresh: before each SearchValidation sheet, GET the latest
       // persisted entity and child resources to refresh search filters.
       if (sheet.sheetType === 'SearchValidation') {
-        test(`[Search Prep] Refresh fields from GET ${pf.entityName}`, async () => {
+        test(`[Search Prep] Refresh fields from GET ${pf.entityName} :: ${sheet.sheetName}`, async () => {
           // GET the most complete org for field values (city, identifier, POC)
           const searchKey = lastPostKey || entityKey;
           if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
