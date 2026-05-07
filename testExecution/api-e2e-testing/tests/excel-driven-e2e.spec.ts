@@ -472,7 +472,11 @@ for (const pf of parsedFiles) {
             if (contactsResp.status === 200) {
               const items = contactsResp.data?.model || contactsResp.data?.model?.items || contactsResp.data?.items || [];
               if (Array.isArray(items) && items.length > 0) {
-                const best = items.find((c: any) => c.typeDisplayName && c.phoneNumber) || items[0];
+                const best = pickBestMatchingItem(items, [
+                  (c: any) => normalizeComparableValue(c?.typeDisplayName) === normalizeComparableValue(resolver.getAll().strTypeDisplayName),
+                  (c: any) => normalizeComparableValue(c?.phoneNumber) === normalizeComparableValue(resolver.getAll().strPhoneNumber),
+                  (c: any) => normalizeComparableValue(c?.name) === normalizeComparableValue(resolver.getAll().strName),
+                ]) || items.find((c: any) => c.typeDisplayName && c.phoneNumber) || items[items.length - 1];
                 if (best.typeDisplayName) resolver.setKey('strTypeDisplayName', best.typeDisplayName);
                 if (best.typeIdentifier) resolver.setKey('intTypeIdentifier', best.typeIdentifier);
                 if (best.typeCodeSystemIdentifier) resolver.setKey('intTypeCodeSystemIdentifier', best.typeCodeSystemIdentifier);
@@ -489,7 +493,8 @@ for (const pf of parsedFiles) {
             if (serviceAreasResp.status === 200) {
               const items = serviceAreasResp.data?.model?.items || serviceAreasResp.data?.items || serviceAreasResp.data?.model || [];
               if (Array.isArray(items) && items.length > 0) {
-                overrideServiceAreaSearchFieldsFromGet(resolver, items[0]);
+                const best = pickBestServiceArea(items, resolver.getAll()) || items[items.length - 1];
+                overrideServiceAreaSearchFieldsFromGet(resolver, best);
               }
             }
           }
@@ -1508,7 +1513,7 @@ function walkSearchSource(node: any, pathSegments: string[], index: Map<string, 
   if (node === undefined || node === null) return;
 
   if (Array.isArray(node)) {
-    for (const item of node) walkSearchSource(item, pathSegments, index);
+    for (const item of [...node].reverse()) walkSearchSource(item, pathSegments, index);
     return;
   }
 
@@ -1553,6 +1558,93 @@ function applySearchBindingsFromSources(
   }
 }
 
+function normalizeComparableValue(value: any): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function pickBestMatchingItem<T>(items: T[], scorers: Array<(item: T) => boolean>): T | null {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  let best: T | null = null;
+  let bestScore = -1;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const score = scorers.reduce((count, scorer) => count + (scorer(item) ? 1 : 0), 0);
+    if (score > bestScore || (score === bestScore && i === items.length - 1)) {
+      best = item;
+      bestScore = score;
+    }
+  }
+
+  return best ?? items[items.length - 1];
+}
+
+function pickBestAddress(addresses: any[], vars: Record<string, string>): any | null {
+  const city = normalizeComparableValue(vars.strCityName || vars.strCity);
+  const street = normalizeComparableValue(vars.strFirstStreetAddress || vars.strStreetName);
+  const postalCode = normalizeComparableValue(vars.strPostalCode);
+  return pickBestMatchingItem(addresses, [
+    address => normalizeComparableValue(address?.cityName || address?.city) === city,
+    address => normalizeComparableValue(address?.firstStreetAddress) === street,
+    address => normalizeComparableValue(address?.postalCode) === postalCode,
+  ]);
+}
+
+function pickBestIdentifier(identifiers: any[], vars: Record<string, string>): any | null {
+  const values = [
+    vars.strIdentifier,
+    vars.strIdentifier1,
+    vars.strIdentifier2,
+  ].map(normalizeComparableValue).filter(Boolean);
+  const typeName = normalizeComparableValue(vars.strIdentifierTypeDisplayName || vars.strbusinessIdentifierDisplayName);
+  const typeCode = normalizeComparableValue(vars.intIdentifierTypeIdentifier || vars.strbusinessIdentifierIdentifier);
+  const typeSystem = normalizeComparableValue(vars.intIdentifierCodeSystemTypeIdentifier || vars.strbusinessIdentifierCodeSystemIdentifier);
+  return pickBestMatchingItem(identifiers, [
+    identifier => values.includes(normalizeComparableValue(identifier?.value)),
+    identifier => normalizeComparableValue(identifier?.type?.name) === typeName,
+    identifier => normalizeComparableValue(identifier?.type?.code) === typeCode,
+    identifier => normalizeComparableValue(identifier?.type?.codeSystemIdentifier) === typeSystem,
+  ]);
+}
+
+function pickBestPhone(phones: any[], vars: Record<string, string>): any | null {
+  const number = normalizeComparableValue(vars.strPhoneNumber);
+  return pickBestMatchingItem(phones, [
+    phone => normalizeComparableValue(phone?.number) === number,
+  ]);
+}
+
+function pickBestServiceArea(serviceAreas: any[], vars: Record<string, string>): any | null {
+  const stateName = normalizeComparableValue(vars.strStateProvinceDisplayName || vars.strStateDisplayName);
+  const stateCode = normalizeComparableValue(vars.intStateProvinceIdentifier || vars.strStateIdentifier);
+  const countyName = normalizeComparableValue(vars.strCountyAreaDisplayName);
+  const countyCode = normalizeComparableValue(vars.intCountyAreaIdentifier);
+  return pickBestMatchingItem(serviceAreas, [
+    area => normalizeComparableValue(area?.stateProvince?.name) === stateName,
+    area => normalizeComparableValue(area?.stateProvince?.code) === stateCode,
+    area => normalizeComparableValue(area?.countyAreas?.[0]?.name) === countyName,
+    area => normalizeComparableValue(area?.countyAreas?.[0]?.code) === countyCode,
+  ]);
+}
+
+function pickBestSubtype(subTypes: any[], vars: Record<string, string>): any | null {
+  const name = normalizeComparableValue(vars.strsubTypeDisplayName);
+  const code = normalizeComparableValue(vars.strsubTypeIdentifier);
+  return pickBestMatchingItem(subTypes, [
+    subType => normalizeComparableValue(subType?.name) === name,
+    subType => normalizeComparableValue(subType?.code) === code,
+  ]);
+}
+
+function pickBestSpecialty(specialties: any[], vars: Record<string, string>): any | null {
+  const name = normalizeComparableValue(vars.strspecialtyTypeDisplayName);
+  const code = normalizeComparableValue(vars.strspecialtyTypeIdentifier);
+  return pickBestMatchingItem(specialties, [
+    specialty => normalizeComparableValue((specialty?.locationSpecialtyCode || specialty?.specialtyType || specialty)?.name) === name,
+    specialty => normalizeComparableValue((specialty?.locationSpecialtyCode || specialty?.specialtyType || specialty)?.code) === code,
+  ]);
+}
+
 
 /**
  * Override search variables with actual persisted values from GET response.
@@ -1560,6 +1652,7 @@ function applySearchBindingsFromSources(
 function overrideSearchFieldsFromGet(
   resolver: VariableResolver, model: any, entityName: string,
 ): void {
+  const vars = resolver.getAll();
   // BusinessProfile fields
   if (model.businessProfile) {
     const bp = model.businessProfile;
@@ -1569,20 +1662,22 @@ function overrideSearchFieldsFromGet(
   }
   if (model.name) resolver.setKey('strName', model.name);
 
-  // City from first address
+  // City from best-matching or newest address
   const addresses = model.organizationAddresses || model.locationAddresses || [];
   if (Array.isArray(addresses) && addresses.length > 0) {
-    const city = addresses[0].cityName || addresses[0].city;
+    const bestAddress = pickBestAddress(addresses, vars) || addresses[addresses.length - 1];
+    const city = bestAddress?.cityName || bestAddress?.city;
     if (city) {
       resolver.setKey('strCity', city);
       resolver.setKey('strCityName', city);
     }
   }
 
-  // Identifier type from first identifier
+  // Identifier type from best-matching or newest identifier
   const identifiers = model.organizationIdentifiers || model.locationIdentifiers || [];
   if (Array.isArray(identifiers) && identifiers.length > 0) {
-    const idType = identifiers[0].type;
+    const bestIdentifier = pickBestIdentifier(identifiers, vars) || identifiers[identifiers.length - 1];
+    const idType = bestIdentifier?.type;
     if (idType?.name) resolver.setKey('strIdentifierTypeDisplayName', idType.name);
     if (idType?.code) resolver.setKey('intIdentifierTypeIdentifier', idType.code);
     if (idType?.codeSystemIdentifier) resolver.setKey('intIdentifierCodeSystemTypeIdentifier', idType.codeSystemIdentifier);
@@ -1591,10 +1686,11 @@ function overrideSearchFieldsFromGet(
     if (idType?.codeSystemIdentifier) resolver.setKey('strbusinessIdentifierCodeSystemIdentifier', idType.codeSystemIdentifier);
   }
 
-  // Phone from first phone
+  // Phone from best-matching or newest phone
   const phones = model.organizationPhones || model.locationPhones || [];
   if (Array.isArray(phones) && phones.length > 0) {
-    if (phones[0].number) resolver.setKey('strPhoneNumber', phones[0].number);
+    const bestPhone = pickBestPhone(phones, vars) || phones[phones.length - 1];
+    if (bestPhone?.number) resolver.setKey('strPhoneNumber', bestPhone.number);
   }
 
   const status = model.status || model.externalStatus;
@@ -1625,17 +1721,20 @@ function overrideSearchFieldsFromGet(
 
   const subTypes = model.locationSubTypes || model.locationTypeSubtypes || [];
   if (Array.isArray(subTypes) && subTypes.length > 0) {
-    const subType = subTypes[0];
+    const subType = pickBestSubtype(subTypes, vars) || subTypes[subTypes.length - 1];
     if (subType?.name) resolver.setKey('strsubTypeDisplayName', subType.name);
     if (subType?.code) resolver.setKey('strsubTypeIdentifier', subType.code);
     if (subType?.codeSystemIdentifier) resolver.setKey('strsubTypeCodeSystemIdentifier', subType.codeSystemIdentifier);
   }
 
+  const specialtyEntry = Array.isArray(model.locationSpecialties) && model.locationSpecialties.length > 0
+    ? pickBestSpecialty(model.locationSpecialties, vars) || model.locationSpecialties[model.locationSpecialties.length - 1]
+    : null;
   const specialty =
     model.locationSpecialtyCode ||
-    model.locationSpecialties?.[0]?.locationSpecialtyCode ||
-    model.locationSpecialties?.[0]?.specialtyType ||
-    model.locationSpecialties?.[0];
+    specialtyEntry?.locationSpecialtyCode ||
+    specialtyEntry?.specialtyType ||
+    specialtyEntry;
   if (specialty) {
     if (specialty.name) resolver.setKey('strspecialtyTypeDisplayName', specialty.name);
     if (specialty.code) resolver.setKey('strspecialtyTypeIdentifier', specialty.code);
@@ -1643,7 +1742,8 @@ function overrideSearchFieldsFromGet(
   }
 
   if (entityName === 'Organization' && model.serviceAreas?.length) {
-    overrideServiceAreaSearchFieldsFromGet(resolver, model.serviceAreas[0]);
+    const bestServiceArea = pickBestServiceArea(model.serviceAreas, vars) || model.serviceAreas[model.serviceAreas.length - 1];
+    overrideServiceAreaSearchFieldsFromGet(resolver, bestServiceArea);
   }
 }
 
