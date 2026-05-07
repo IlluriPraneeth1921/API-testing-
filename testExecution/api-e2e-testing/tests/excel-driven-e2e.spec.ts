@@ -199,6 +199,14 @@ function shouldRunType(sheetType: SheetType): boolean {
   return map[TEST_TYPE]?.includes(sheetType) ?? true;
 }
 
+function collectSearchVariables(suite: TestSuite): string[] {
+  const searchTexts = suite.sheets
+    .filter(sheet => sheet.sheetType === 'SearchValidation')
+    .flatMap(sheet => sheet.scenarios.map(sc => sc.requestUrl || ''));
+
+  return [...extractVariables(searchTexts)].sort();
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // BLOCK 4: PARSE EXCEL FILES — Read all matched Excel files at load time
 //   - Extracts TFS ID + entity name from filename (e.g. 728300_Organization)
@@ -221,6 +229,7 @@ interface ParsedFile {
   entityName: string;
   suite: TestSuite;
   route: ReturnType<typeof resolveRoute>;
+  searchVariables: string[];
 }
 
 const parsedFiles: ParsedFile[] = [];
@@ -229,7 +238,8 @@ for (const file of files) {
     const { tfsId, entityName } = parseFilename(file);
     const suite = parseExcel(file);
     const route = resolveRoute(entityName);
-    parsedFiles.push({ file, tfsId, entityName, suite, route });
+    const searchVariables = collectSearchVariables(suite);
+    parsedFiles.push({ file, tfsId, entityName, suite, route, searchVariables });
   } catch (e: any) {
     // Will create a failing test below
     const { tfsId, entityName } = parseFilename(file);
@@ -237,6 +247,7 @@ for (const file of files) {
       file, tfsId, entityName,
       suite: { filename: file, tfsId, entityName, sheets: [] },
       route: resolveRoute(entityName),
+      searchVariables: [],
     });
   }
 }
@@ -435,7 +446,7 @@ for (const pf of parsedFiles) {
               }
             }
           }
-          resolver.snapshotSearchFields();
+          resolver.snapshotSearchFields(pf.searchVariables);
           console.log(`   \ud83d\udd04 Search fields refreshed`);
         });
       }
@@ -458,7 +469,7 @@ for (const pf of parsedFiles) {
             };
 
             try {
-              await runScenario(api, resolver, pf.route, pf.entityName, sheet, scenario, result, (pf as any)._swagger);
+              await runScenario(api, resolver, pf.route, pf.entityName, sheet, scenario, result, pf.searchVariables, (pf as any)._swagger);
               if (result.passed !== false) result.passed = true;
             } catch (e: any) {
               result.passed = false;
@@ -475,7 +486,7 @@ for (const pf of parsedFiles) {
                 console.log(`   🔑 ${pf.entityName}Key = ${entityKey}`);
                 if (!searchFieldsSnapshotted) {
                   searchFieldsSnapshotted = true;
-                  resolver.snapshotSearchFields();
+                  resolver.snapshotSearchFields(pf.searchVariables);
                 }
               }
               // After each CreateHappy, GET the entity and override search fields
@@ -487,7 +498,7 @@ for (const pf of parsedFiles) {
                   const m = vResp.data?.model ?? vResp.data;
                   if (m && typeof m === 'object') overrideSearchFieldsFromGet(resolver, m, pf.entityName);
                 }
-                resolver.snapshotSearchFields();
+                resolver.snapshotSearchFields(pf.searchVariables);
               }
               // Re-enrich org after AddRemoveTest removes data that search needs
               if (sheet.sheetType === 'AddRemoveTest' && entityKey && i === scenarios.length - 1 && pf.entityName === 'Organization') {
@@ -787,6 +798,7 @@ async function runScenario(
   api: ApiClient, resolver: VariableResolver,
   route: ReturnType<typeof resolveRoute>, entityName: string,
   sheet: TestSheet, sc: TestScenario, result: Partial<ScenarioResult>,
+  searchVariables: string[],
   swagger?: Record<string, any> | null,
 ): Promise<void> {
   switch (sheet.sheetType) {
@@ -797,7 +809,7 @@ async function runScenario(
     case 'UpdateNegative':
       return runNegative(api, resolver, route, sc, sheet, result, entityName);
     case 'SubEndpointHappy':
-      return runSubEndpointHappy(api, resolver, route, sc, result, swagger);
+      return runSubEndpointHappy(api, resolver, route, sc, result, searchVariables, swagger);
     case 'SubEndpointNegative':
       return runSubEndpointNegative(api, resolver, route, sc, result, swagger);
     case 'SearchValidation':
@@ -912,7 +924,8 @@ async function runNegative(
 // ── SUB-ENDPOINT HAPPY: PUT to child resource (e.g. /org/{key}/contact) → expect 200 ──
 async function runSubEndpointHappy(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
-  sc: TestScenario, result: Partial<ScenarioResult>, swagger?: Record<string, any> | null,
+  sc: TestScenario, result: Partial<ScenarioResult>, searchVariables: string[],
+  swagger?: Record<string, any> | null,
 ) {
   // Inject fresh random names/emails so every scenario creates unique data
   resolver.randomizeFields();
@@ -937,7 +950,7 @@ async function runSubEndpointHappy(
   if (resp.status >= 200 && resp.status < 300 && resp.data) {
     captureSubEndpointKeys(resp.data, url, resolver);
     // Snapshot randomized fields so search scenarios match the created sub-endpoint data
-    resolver.snapshotSearchFields();
+    resolver.snapshotSearchFields(searchVariables);
   }
 
   assertStatus(resp.status, result.expectedStatus, sc.scenario);

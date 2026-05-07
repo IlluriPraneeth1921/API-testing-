@@ -130,6 +130,7 @@
     "test:f1:staffmember": "cross-env ENV_NAME=F1 EXCEL=727911_StaffMember.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e",
     "test:f1:all": "cross-env ENV_NAME=F1 SKIP_SQL=true npx playwright test excel-driven-e2e",
     "report": "npx playwright show-report playwright-report",
+    "audit:excel:variables": "npx ts-node lib/core/excel-variable-audit.ts",
     "report:consolidated": "npx ts-node lib/core/consolidated-report.ts",
     "report:consolidated:filter": "npx ts-node lib/core/consolidated-report.ts",
     "test:f1:person": "cross-env ENV_NAME=F1 EXCEL=614086_Person.xlsx SKIP_SQL=true npx playwright test excel-driven-e2e"
