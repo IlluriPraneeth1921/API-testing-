@@ -1645,7 +1645,6 @@ function pickBestSpecialty(specialties: any[], vars: Record<string, string>): an
   ]);
 }
 
-
 /**
  * Override search variables with actual persisted values from GET response.
  */
