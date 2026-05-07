@@ -453,6 +453,10 @@ for (const pf of parsedFiles) {
           const searchKey = lastPostKey || entityKey;
           if (!searchKey) { console.log('   \u26a0 No key \u2014 skipping search prep'); return; }
           const searchSources: any[] = [];
+          if (lastPostBody) {
+            overrideSearchFieldsFromGet(resolver, lastPostBody, pf.entityName);
+            searchSources.push(lastPostBody);
+          }
           if (pf.entityName === 'Organization') {
             await enrichOrgForSearch(api, resolver, pf.route, searchKey);
           }
@@ -461,7 +465,7 @@ for (const pf of parsedFiles) {
             const model = refreshResp.data?.model ?? refreshResp.data;
             if (model && typeof model === 'object') {
               console.log(`   \ud83d\udd0d Org GET: bp.poc=${model.businessProfile?.pointOfContactName}, identifiers=${model.organizationIdentifiers?.length}, phones=${model.organizationPhones?.length}`);
-              overrideSearchFieldsFromGet(resolver, model, pf.entityName);
+              overrideSearchFieldsFromGet(resolver, model, pf.entityName, { preserveExisting: true });
               searchSources.push(model);
             }
           }
@@ -546,6 +550,9 @@ for (const pf of parsedFiles) {
                 entityKey = result.entityKey;
                 resolver.setKey(`str${pf.entityName}Key`, entityKey);
                 lastPostBody = (result as any)._postBody || null;
+                if (lastPostBody) {
+                  overrideSearchFieldsFromGet(resolver, lastPostBody, pf.entityName);
+                }
                 console.log(`   🔑 ${pf.entityName}Key = ${entityKey}`);
                 if (!searchFieldsSnapshotted) {
                   searchFieldsSnapshotted = true;
@@ -559,7 +566,7 @@ for (const pf of parsedFiles) {
                 const vResp = await api.send('GET', vUrl);
                 if (vResp.status === 200) {
                   const m = vResp.data?.model ?? vResp.data;
-                  if (m && typeof m === 'object') overrideSearchFieldsFromGet(resolver, m, pf.entityName);
+                  if (m && typeof m === 'object') overrideSearchFieldsFromGet(resolver, m, pf.entityName, { preserveExisting: true });
                 }
                 resolver.snapshotSearchFields(pf.searchVariables);
               }
@@ -575,6 +582,8 @@ for (const pf of parsedFiles) {
                 if (newSize > oldSize) {
                   lastPostBody = newBody;
                   lastPostKey = result.entityKey || lastPostKey;
+                  overrideSearchFieldsFromGet(resolver, lastPostBody, pf.entityName);
+                  resolver.snapshotSearchFields(pf.searchVariables);
                 }
               }
             }
@@ -1650,16 +1659,23 @@ function pickBestSpecialty(specialties: any[], vars: Record<string, string>): an
  */
 function overrideSearchFieldsFromGet(
   resolver: VariableResolver, model: any, entityName: string,
+  options?: { preserveExisting?: boolean },
 ): void {
+  const preserveExisting = options?.preserveExisting === true;
   const vars = resolver.getAll();
+  const setSearchValue = (name: string, value: any) => {
+    if (value === undefined || value === null || value === '') return;
+    if (preserveExisting && resolver.getAll()[name]) return;
+    resolver.setKey(name, String(value));
+  };
   // BusinessProfile fields
   if (model.businessProfile) {
     const bp = model.businessProfile;
-    if (bp.fullName) resolver.setKey('strFullName', bp.fullName);
-    if (bp.shortName) resolver.setKey('strShortName', bp.shortName);
-    if (bp.pointOfContactName) resolver.setKey('strPointOfContactName', bp.pointOfContactName);
+    if (bp.fullName) setSearchValue('strFullName', bp.fullName);
+    if (bp.shortName) setSearchValue('strShortName', bp.shortName);
+    if (bp.pointOfContactName) setSearchValue('strPointOfContactName', bp.pointOfContactName);
   }
-  if (model.name) resolver.setKey('strName', model.name);
+  if (model.name) setSearchValue('strName', model.name);
 
   // City from best-matching or newest address
   const addresses = model.organizationAddresses || model.locationAddresses || [];
@@ -1667,8 +1683,8 @@ function overrideSearchFieldsFromGet(
     const bestAddress = pickBestAddress(addresses, vars) || addresses[addresses.length - 1];
     const city = bestAddress?.cityName || bestAddress?.city;
     if (city) {
-      resolver.setKey('strCity', city);
-      resolver.setKey('strCityName', city);
+      setSearchValue('strCity', city);
+      setSearchValue('strCityName', city);
     }
   }
 
@@ -1677,53 +1693,53 @@ function overrideSearchFieldsFromGet(
   if (Array.isArray(identifiers) && identifiers.length > 0) {
     const bestIdentifier = pickBestIdentifier(identifiers, vars) || identifiers[identifiers.length - 1];
     const idType = bestIdentifier?.type;
-    if (idType?.name) resolver.setKey('strIdentifierTypeDisplayName', idType.name);
-    if (idType?.code) resolver.setKey('intIdentifierTypeIdentifier', idType.code);
-    if (idType?.codeSystemIdentifier) resolver.setKey('intIdentifierCodeSystemTypeIdentifier', idType.codeSystemIdentifier);
-    if (idType?.name) resolver.setKey('strbusinessIdentifierDisplayName', idType.name);
-    if (idType?.code) resolver.setKey('strbusinessIdentifierIdentifier', idType.code);
-    if (idType?.codeSystemIdentifier) resolver.setKey('strbusinessIdentifierCodeSystemIdentifier', idType.codeSystemIdentifier);
+    if (idType?.name) setSearchValue('strIdentifierTypeDisplayName', idType.name);
+    if (idType?.code) setSearchValue('intIdentifierTypeIdentifier', idType.code);
+    if (idType?.codeSystemIdentifier) setSearchValue('intIdentifierCodeSystemTypeIdentifier', idType.codeSystemIdentifier);
+    if (idType?.name) setSearchValue('strbusinessIdentifierDisplayName', idType.name);
+    if (idType?.code) setSearchValue('strbusinessIdentifierIdentifier', idType.code);
+    if (idType?.codeSystemIdentifier) setSearchValue('strbusinessIdentifierCodeSystemIdentifier', idType.codeSystemIdentifier);
   }
 
   // Phone from best-matching or newest phone
   const phones = model.organizationPhones || model.locationPhones || [];
   if (Array.isArray(phones) && phones.length > 0) {
     const bestPhone = pickBestPhone(phones, vars) || phones[phones.length - 1];
-    if (bestPhone?.number) resolver.setKey('strPhoneNumber', bestPhone.number);
+    if (bestPhone?.number) setSearchValue('strPhoneNumber', bestPhone.number);
   }
 
   const status = model.status || model.externalStatus;
   if (status) {
     if (status.name) {
-      resolver.setKey('strStatusDisplayName', status.name);
-      resolver.setKey('strstatusDisplayName', status.name);
-      resolver.setKey('strLocationStatusDisplayName', status.name);
+      setSearchValue('strStatusDisplayName', status.name);
+      setSearchValue('strstatusDisplayName', status.name);
+      setSearchValue('strLocationStatusDisplayName', status.name);
     }
     if (status.code) {
-      resolver.setKey('intStatusIdentifier', status.code);
-      resolver.setKey('strstatusIdentifier', status.code);
-      resolver.setKey('intLocationStatusIdentifier', status.code);
+      setSearchValue('intStatusIdentifier', status.code);
+      setSearchValue('strstatusIdentifier', status.code);
+      setSearchValue('intLocationStatusIdentifier', status.code);
     }
     if (status.codeSystemIdentifier) {
-      resolver.setKey('intStatusCodeSystemIdentifier', status.codeSystemIdentifier);
-      resolver.setKey('strstatusCodeSystemIdentifier', status.codeSystemIdentifier);
-      resolver.setKey('intLocationStatusCodeSystemIdentifier', status.codeSystemIdentifier);
+      setSearchValue('intStatusCodeSystemIdentifier', status.codeSystemIdentifier);
+      setSearchValue('strstatusCodeSystemIdentifier', status.codeSystemIdentifier);
+      setSearchValue('intLocationStatusCodeSystemIdentifier', status.codeSystemIdentifier);
     }
   }
 
   const primaryType = model.locationPrimaryType || model.primaryType;
   if (primaryType) {
-    if (primaryType.name) resolver.setKey('strprimaryTypeDisplayName', primaryType.name);
-    if (primaryType.code) resolver.setKey('strprimaryTypeIdentifier', primaryType.code);
-    if (primaryType.codeSystemIdentifier) resolver.setKey('strprimaryTypeCodeSystemIdentifier', primaryType.codeSystemIdentifier);
+    if (primaryType.name) setSearchValue('strprimaryTypeDisplayName', primaryType.name);
+    if (primaryType.code) setSearchValue('strprimaryTypeIdentifier', primaryType.code);
+    if (primaryType.codeSystemIdentifier) setSearchValue('strprimaryTypeCodeSystemIdentifier', primaryType.codeSystemIdentifier);
   }
 
   const subTypes = model.locationSubTypes || model.locationTypeSubtypes || [];
   if (Array.isArray(subTypes) && subTypes.length > 0) {
     const subType = pickBestSubtype(subTypes, vars) || subTypes[subTypes.length - 1];
-    if (subType?.name) resolver.setKey('strsubTypeDisplayName', subType.name);
-    if (subType?.code) resolver.setKey('strsubTypeIdentifier', subType.code);
-    if (subType?.codeSystemIdentifier) resolver.setKey('strsubTypeCodeSystemIdentifier', subType.codeSystemIdentifier);
+    if (subType?.name) setSearchValue('strsubTypeDisplayName', subType.name);
+    if (subType?.code) setSearchValue('strsubTypeIdentifier', subType.code);
+    if (subType?.codeSystemIdentifier) setSearchValue('strsubTypeCodeSystemIdentifier', subType.codeSystemIdentifier);
   }
 
   const specialtyEntry = Array.isArray(model.locationSpecialties) && model.locationSpecialties.length > 0
@@ -1735,38 +1751,45 @@ function overrideSearchFieldsFromGet(
     specialtyEntry?.specialtyType ||
     specialtyEntry;
   if (specialty) {
-    if (specialty.name) resolver.setKey('strspecialtyTypeDisplayName', specialty.name);
-    if (specialty.code) resolver.setKey('strspecialtyTypeIdentifier', specialty.code);
-    if (specialty.codeSystemIdentifier) resolver.setKey('strspecialtyTypeCodeSystemIdentifier', specialty.codeSystemIdentifier);
+    if (specialty.name) setSearchValue('strspecialtyTypeDisplayName', specialty.name);
+    if (specialty.code) setSearchValue('strspecialtyTypeIdentifier', specialty.code);
+    if (specialty.codeSystemIdentifier) setSearchValue('strspecialtyTypeCodeSystemIdentifier', specialty.codeSystemIdentifier);
   }
 
   if (entityName === 'Organization' && model.serviceAreas?.length) {
     const bestServiceArea = pickBestServiceArea(model.serviceAreas, vars) || model.serviceAreas[model.serviceAreas.length - 1];
-    overrideServiceAreaSearchFieldsFromGet(resolver, bestServiceArea);
+    overrideServiceAreaSearchFieldsFromGet(resolver, bestServiceArea, options);
   }
 }
 
 function overrideServiceAreaSearchFieldsFromGet(
   resolver: VariableResolver, serviceArea: any,
+  options?: { preserveExisting?: boolean },
 ): void {
   if (!serviceArea || typeof serviceArea !== 'object') return;
+  const preserveExisting = options?.preserveExisting === true;
+  const setSearchValue = (name: string, value: any) => {
+    if (value === undefined || value === null || value === '') return;
+    if (preserveExisting && resolver.getAll()[name]) return;
+    resolver.setKey(name, String(value));
+  };
 
   const state = serviceArea.stateProvince;
   if (state) {
-    if (state.name) resolver.setKey('strStateDisplayName', state.name);
-    if (state.name) resolver.setKey('strStateProvinceDisplayName', state.name);
-    if (state.code) resolver.setKey('strStateIdentifier', state.code);
-    if (state.code) resolver.setKey('intStateProvinceIdentifier', state.code);
-    if (state.codeSystemIdentifier) resolver.setKey('strStateCodeSystemIdentifier', state.codeSystemIdentifier);
-    if (state.codeSystemIdentifier) resolver.setKey('intStateProvinceCodeSystemIdentifier', state.codeSystemIdentifier);
+    if (state.name) setSearchValue('strStateDisplayName', state.name);
+    if (state.name) setSearchValue('strStateProvinceDisplayName', state.name);
+    if (state.code) setSearchValue('strStateIdentifier', state.code);
+    if (state.code) setSearchValue('intStateProvinceIdentifier', state.code);
+    if (state.codeSystemIdentifier) setSearchValue('strStateCodeSystemIdentifier', state.codeSystemIdentifier);
+    if (state.codeSystemIdentifier) setSearchValue('intStateProvinceCodeSystemIdentifier', state.codeSystemIdentifier);
   }
 
   const county = Array.isArray(serviceArea.countyAreas) && serviceArea.countyAreas.length > 0
     ? serviceArea.countyAreas[0]
     : null;
   if (county) {
-    if (county.name) resolver.setKey('strCountyAreaDisplayName', county.name);
-    if (county.code) resolver.setKey('intCountyAreaIdentifier', county.code);
-    if (county.codeSystemIdentifier) resolver.setKey('intCountyAreaCodeSystemIdentifier', county.codeSystemIdentifier);
+    if (county.name) setSearchValue('strCountyAreaDisplayName', county.name);
+    if (county.code) setSearchValue('intCountyAreaIdentifier', county.code);
+    if (county.codeSystemIdentifier) setSearchValue('intCountyAreaCodeSystemIdentifier', county.codeSystemIdentifier);
   }
 }
