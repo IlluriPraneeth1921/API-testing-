@@ -52,6 +52,10 @@ const SQL_KEY_MAP: Record<string, { schema: string; table: string; keyCol: strin
   strRegionKey:                  { schema: 'RegionModule',            table: 'Region',                  keyCol: 'RegionKey' },
 };
 
+export function getKnownSqlVariableNames(): string[] {
+  return Object.keys(SQL_KEY_MAP);
+}
+
 // ── Tier 2: Generated values ──
 
 function generateTier2(baseUrl: string, resource: string): ResolvedVars {
@@ -173,6 +177,23 @@ function generateTier2(baseUrl: string, resource: string): ResolvedVars {
     // These keys should be resolved via SQL or API lookup instead.
   };
 }
+
+export function getGeneratedVariableNames(): string[] {
+  return Object.keys(generateTier2('', ''));
+}
+
+const DEFAULT_SEARCH_SNAPSHOT_KEYS = [
+  'strName', 'strFullName', 'strShortName', 'strFirstName', 'strLastName',
+  'strDoingBusinessAsName', 'strBusinessName', 'strPointOfContactName',
+  'strEmail', 'strEmail1', 'strEmail2', 'strEmailAddress',
+  'strIdentifier', 'strIdentifier1', 'strIdentifier2',
+  'strTitle', 'strCity', 'strCityName',
+  'strPhoneNumber', 'strPhoneNumber1', 'strPhoneNumber2',
+  'strFirstStreetAddress', 'strStreetName', 'strPostalCode',
+  'intCredentialNumber', 'intCredentialNumber1', 'intCredentialNumber2',
+  'strIdentifierTypeDisplayName', 'intIdentifierTypeIdentifier', 'intIdentifierCodeSystemTypeIdentifier',
+  'strTypeDisplayName', 'intTypeIdentifier', 'intTypeCodeSystemIdentifier',
+];
 
 // ── Main Resolver ──
 
@@ -386,19 +407,11 @@ export class VariableResolver {
 
   /** Snapshot current randomized field values (called after first successful CreateHappy).
    *  Search scenarios will restore these so their filter values match the created data. */
-  snapshotSearchFields(): void {
-    const searchKeys = [
-      'strName', 'strFullName', 'strShortName', 'strFirstName', 'strLastName',
-      'strDoingBusinessAsName', 'strBusinessName', 'strPointOfContactName',
-      'strEmail', 'strEmail1', 'strEmail2', 'strEmailAddress',
-      'strIdentifier', 'strIdentifier1', 'strIdentifier2',
-      'strTitle', 'strCity', 'strCityName',
-      'strPhoneNumber', 'strPhoneNumber1', 'strPhoneNumber2',
-      'strFirstStreetAddress', 'strStreetName', 'strPostalCode',
-      'intCredentialNumber', 'intCredentialNumber1', 'intCredentialNumber2',
-      'strIdentifierTypeDisplayName', 'intIdentifierTypeIdentifier', 'intIdentifierCodeSystemTypeIdentifier',
-      'strTypeDisplayName', 'intTypeIdentifier', 'intTypeCodeSystemIdentifier',
-    ];
+  snapshotSearchFields(variableNames?: Iterable<string>): void {
+    const searchKeys = new Set(DEFAULT_SEARCH_SNAPSHOT_KEYS);
+    for (const rawName of variableNames || []) {
+      if (rawName) searchKeys.add(rawName);
+    }
     this.searchSnapshot = {};
     for (const k of searchKeys) {
       if (this.cache[k]) this.searchSnapshot[k] = this.cache[k];

@@ -48,13 +48,118 @@ const { name: ENV_NAME, config: CFG } = loadEnvConfig();  // reads env_config.js
 const SKIP_SQL = process.env.SKIP_SQL === 'true';          // skip SQL verification
 const MAX_SCENARIOS = process.env.MAX_SCENARIOS ? parseInt(process.env.MAX_SCENARIOS) : undefined; // limit scenarios per sheet
 const TEST_TYPE = process.env.TEST_TYPE;                   // filter: happy|negative|search|error|combo
+const MODULE_FILTER = process.env.MODULE;                  // filter by module name/segment
+const AGGREGATE_FILTER = process.env.AGGREGATE;            // filter by entity/aggregate name
 
 // ══════════════════════════════════════════════════════════════════════
 // BLOCK 2: FILE RESOLUTION — Decide which Excel files to run
 //   - EXCEL env var → run single file
 //   - TFS env var   → find by TFS ID prefix
+//   - MODULE env var → run files whose module matches
+//   - AGGREGATE env var → run files whose aggregate/entity matches
 //   - Neither       → run ALL Excel files in API-TestData/
 // ══════════════════════════════════════════════════════════════════════
+
+function splitFilterValues(raw?: string): string[] {
+  return (raw || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+function normalizeFilterValue(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function toFilterTokens(value: string): string[] {
+  const normalized = normalizeFilterValue(value);
+  if (!normalized) return [];
+  const withoutModuleSuffix = normalized.replace(/module$/, '');
+  return [...new Set([normalized, withoutModuleSuffix].filter(Boolean))];
+}
+
+function getModuleSegment(postRoute: string): string {
+  const segments = postRoute.split('/').filter(Boolean);
+  return segments[2] || '';
+}
+
+function getEntityWords(entityName: string): string[] {
+  return entityName
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+interface FileSelectionMeta {
+  entityName: string;
+  moduleTokens: string[];
+  aggregateTokens: string[];
+}
+
+const fileSelectionMetaCache = new Map<string, FileSelectionMeta>();
+
+function getFileSelectionMeta(file: string): FileSelectionMeta {
+  const cached = fileSelectionMetaCache.get(file);
+  if (cached) return cached;
+
+  const { entityName } = parseFilename(file);
+  const route = resolveRoute(entityName);
+  const moduleSegment = getModuleSegment(route.postRoute);
+  const entityWords = getEntityWords(entityName);
+
+  const moduleTokens = new Set<string>([
+    normalizeFilterValue(moduleSegment),
+    normalizeFilterValue(moduleSegment).replace(/module$/, ''),
+  ]);
+
+  const aggregateTokens = new Set<string>([
+    ...toFilterTokens(entityName),
+    ...entityWords.flatMap(toFilterTokens),
+  ]);
+
+  const meta = {
+    entityName,
+    moduleTokens: [...moduleTokens],
+    aggregateTokens: [...aggregateTokens],
+  };
+  fileSelectionMetaCache.set(file, meta);
+  return meta;
+}
+
+function matchesModuleFilter(file: string, rawFilter: string | undefined): boolean {
+  const filters = splitFilterValues(rawFilter);
+  if (filters.length === 0) return true;
+
+  const meta = getFileSelectionMeta(file);
+  return filters.some(filterValue => {
+    const normalizedFilter = normalizeFilterValue(filterValue);
+    if (!normalizedFilter) return false;
+
+    if (normalizedFilter.endsWith('module')) {
+      return meta.moduleTokens[0] === normalizedFilter;
+    }
+
+    return meta.moduleTokens.some(candidate => candidate.includes(normalizedFilter));
+  });
+}
+
+function matchesAggregateFilter(file: string, rawFilter: string | undefined): boolean {
+  const filters = splitFilterValues(rawFilter);
+  if (filters.length === 0) return true;
+
+  const meta = getFileSelectionMeta(file);
+  return filters.some(filterValue => {
+    const filterTokens = toFilterTokens(filterValue);
+    return filterTokens.some(filterToken =>
+      meta.aggregateTokens.some(candidate =>
+        candidate === filterToken ||
+        candidate.includes(filterToken) ||
+        filterToken.includes(candidate)
+      )
+    );
+  });
+}
 
 function resolveFiles(): string[] {
   const all = listExcelFiles();
@@ -66,7 +171,10 @@ function resolveFiles(): string[] {
     const f = all.find(f => f.startsWith(process.env.TFS! + '_'));
     return f ? [f] : [];
   }
-  return all;
+
+  return all
+    .filter(file => matchesModuleFilter(file, MODULE_FILTER))
+    .filter(file => matchesAggregateFilter(file, AGGREGATE_FILTER));
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -91,6 +199,14 @@ function shouldRunType(sheetType: SheetType): boolean {
   return map[TEST_TYPE]?.includes(sheetType) ?? true;
 }
 
+function collectSearchVariables(suite: TestSuite): string[] {
+  const searchTexts = suite.sheets
+    .filter(sheet => sheet.sheetType === 'SearchValidation')
+    .flatMap(sheet => sheet.scenarios.map(sc => sc.requestUrl || ''));
+
+  return [...extractVariables(searchTexts)].sort();
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // BLOCK 4: PARSE EXCEL FILES — Read all matched Excel files at load time
 //   - Extracts TFS ID + entity name from filename (e.g. 728300_Organization)
@@ -100,6 +216,12 @@ function shouldRunType(sheetType: SheetType): boolean {
 // ══════════════════════════════════════════════════════════════════════
 
 const files = resolveFiles();
+if (MODULE_FILTER || AGGREGATE_FILTER) {
+  console.log(
+    `[excel-driven-e2e] Selected ${files.length} Excel file(s) ` +
+    `(MODULE=${MODULE_FILTER || '-'} AGGREGATE=${AGGREGATE_FILTER || '-'})`
+  );
+}
 
 interface ParsedFile {
   file: string;
@@ -107,6 +229,7 @@ interface ParsedFile {
   entityName: string;
   suite: TestSuite;
   route: ReturnType<typeof resolveRoute>;
+  searchVariables: string[];
 }
 
 const parsedFiles: ParsedFile[] = [];
@@ -115,7 +238,8 @@ for (const file of files) {
     const { tfsId, entityName } = parseFilename(file);
     const suite = parseExcel(file);
     const route = resolveRoute(entityName);
-    parsedFiles.push({ file, tfsId, entityName, suite, route });
+    const searchVariables = collectSearchVariables(suite);
+    parsedFiles.push({ file, tfsId, entityName, suite, route, searchVariables });
   } catch (e: any) {
     // Will create a failing test below
     const { tfsId, entityName } = parseFilename(file);
@@ -123,6 +247,7 @@ for (const file of files) {
       file, tfsId, entityName,
       suite: { filename: file, tfsId, entityName, sheets: [] },
       route: resolveRoute(entityName),
+      searchVariables: [],
     });
   }
 }
@@ -151,7 +276,10 @@ for (const file of files) {
 
 if (parsedFiles.length === 0) {
   test('No Excel files matched', () => {
-    console.log(`No files matched. EXCEL=${process.env.EXCEL} TFS=${process.env.TFS}`);
+    console.log(
+      `No files matched. EXCEL=${process.env.EXCEL} TFS=${process.env.TFS} ` +
+      `MODULE=${MODULE_FILTER} AGGREGATE=${AGGREGATE_FILTER}`
+    );
     test.skip();
   });
 }
@@ -318,7 +446,7 @@ for (const pf of parsedFiles) {
               }
             }
           }
-          resolver.snapshotSearchFields();
+          resolver.snapshotSearchFields(pf.searchVariables);
           console.log(`   \ud83d\udd04 Search fields refreshed`);
         });
       }
@@ -341,7 +469,7 @@ for (const pf of parsedFiles) {
             };
 
             try {
-              await runScenario(api, resolver, pf.route, pf.entityName, sheet, scenario, result, (pf as any)._swagger);
+              await runScenario(api, resolver, pf.route, pf.entityName, sheet, scenario, result, pf.searchVariables, (pf as any)._swagger);
               if (result.passed !== false) result.passed = true;
             } catch (e: any) {
               result.passed = false;
@@ -358,7 +486,7 @@ for (const pf of parsedFiles) {
                 console.log(`   🔑 ${pf.entityName}Key = ${entityKey}`);
                 if (!searchFieldsSnapshotted) {
                   searchFieldsSnapshotted = true;
-                  resolver.snapshotSearchFields();
+                  resolver.snapshotSearchFields(pf.searchVariables);
                 }
               }
               // After each CreateHappy, GET the entity and override search fields
@@ -370,7 +498,7 @@ for (const pf of parsedFiles) {
                   const m = vResp.data?.model ?? vResp.data;
                   if (m && typeof m === 'object') overrideSearchFieldsFromGet(resolver, m, pf.entityName);
                 }
-                resolver.snapshotSearchFields();
+                resolver.snapshotSearchFields(pf.searchVariables);
               }
               // Re-enrich org after AddRemoveTest removes data that search needs
               if (sheet.sheetType === 'AddRemoveTest' && entityKey && i === scenarios.length - 1 && pf.entityName === 'Organization') {
@@ -670,6 +798,7 @@ async function runScenario(
   api: ApiClient, resolver: VariableResolver,
   route: ReturnType<typeof resolveRoute>, entityName: string,
   sheet: TestSheet, sc: TestScenario, result: Partial<ScenarioResult>,
+  searchVariables: string[],
   swagger?: Record<string, any> | null,
 ): Promise<void> {
   switch (sheet.sheetType) {
@@ -680,7 +809,7 @@ async function runScenario(
     case 'UpdateNegative':
       return runNegative(api, resolver, route, sc, sheet, result, entityName);
     case 'SubEndpointHappy':
-      return runSubEndpointHappy(api, resolver, route, sc, result, swagger);
+      return runSubEndpointHappy(api, resolver, route, sc, result, searchVariables, swagger);
     case 'SubEndpointNegative':
       return runSubEndpointNegative(api, resolver, route, sc, result, swagger);
     case 'SearchValidation':
@@ -795,7 +924,8 @@ async function runNegative(
 // ── SUB-ENDPOINT HAPPY: PUT to child resource (e.g. /org/{key}/contact) → expect 200 ──
 async function runSubEndpointHappy(
   api: ApiClient, resolver: VariableResolver, route: ReturnType<typeof resolveRoute>,
-  sc: TestScenario, result: Partial<ScenarioResult>, swagger?: Record<string, any> | null,
+  sc: TestScenario, result: Partial<ScenarioResult>, searchVariables: string[],
+  swagger?: Record<string, any> | null,
 ) {
   // Inject fresh random names/emails so every scenario creates unique data
   resolver.randomizeFields();
@@ -820,7 +950,7 @@ async function runSubEndpointHappy(
   if (resp.status >= 200 && resp.status < 300 && resp.data) {
     captureSubEndpointKeys(resp.data, url, resolver);
     // Snapshot randomized fields so search scenarios match the created sub-endpoint data
-    resolver.snapshotSearchFields();
+    resolver.snapshotSearchFields(searchVariables);
   }
 
   assertStatus(resp.status, result.expectedStatus, sc.scenario);
